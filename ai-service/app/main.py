@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -12,6 +14,38 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.database import close_db, init_db
+
+
+# ---------------------------------------------------------------------------
+# Uvicorn 日志过滤 — 屏蔽 /health 巡检 & HEAD 扫描噪声
+# ---------------------------------------------------------------------------
+
+
+class HealthAndScanFilter(logging.Filter):
+    """屏蔽 /health GET 与外部 HEAD 扫描的访问日志，仅保留关键业务报错。"""
+
+    _QUIET_PATHS = ("/health", "/favicon.ico")
+    _QUIET_METHODS = ("HEAD",)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage() if record.args else record.getMessage()
+        # 屏蔽 /health 巡检
+        for path in self._QUIET_PATHS:
+            if path in msg:
+                return False
+        # 屏蔽 HEAD 扫描
+        for method in self._QUIET_METHODS:
+            if f'"{method} ' in msg or f'"{method}/' in msg:
+                return False
+        return True
+
+
+def _configure_uvicorn_logging() -> None:
+    uvicorn_access = logging.getLogger("uvicorn.access")
+    uvicorn_access.addFilter(HealthAndScanFilter())
+
+
+_configure_uvicorn_logging()
 
 
 # ---------------------------------------------------------------------------
@@ -204,10 +238,23 @@ def _register_routers(app: FastAPI) -> None:
         name="uploads",
     )
 
-    # ── Health check ──
+    # ── Health check（GET + HEAD 兼容外部探活） ──
     @app.get("/health", include_in_schema=False)
     async def health():
         return {"status": "ok"}
+
+    @app.head("/health", include_in_schema=False)
+    async def health_head():
+        return JSONResponse(content=None, headers={"Content-Length": "15"})
+
+    # ── 根路径 GET + HEAD 兼容（消除外部扫描 405 日志） ──
+    @app.get("/", include_in_schema=False)
+    async def root():
+        return {"service": "Avireon Music", "version": "2.0.0", "status": "ok"}
+
+    @app.head("/", include_in_schema=False)
+    async def root_head():
+        return JSONResponse(content=None)
 
 
 # Singleton

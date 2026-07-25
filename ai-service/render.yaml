@@ -9,8 +9,7 @@ services:
     envVars:
       - key: SERVICE_HOST
         value: "0.0.0.0"
-      - key: SERVICE_PORT
-        value: "10000"
+      # Render 自动注入 PORT，无需手动配置；如需本地自定义用 SERVICE_PORT
       - key: INTERNAL_API_TOKEN
         generateValue: true
       - key: ALLOWED_ORIGINS
