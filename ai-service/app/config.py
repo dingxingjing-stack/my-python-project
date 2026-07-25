@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     openrouter_long_model: str = "nvidia/nemotron-3-ultra:free"
     openrouter_code_model: str = "cohere/command-r-code:free"
     openrouter_vision_model: str = "nvidia/nemotron-3-nano-omni:free"
+    openrouter_text_fallback: str = "lagoon/laguna-m.1:free"
 
     # ── 硅基流动 SiliconFlow ──
     siliconflow_api_key: str = ""
@@ -54,6 +55,34 @@ class Settings(BaseSettings):
     daily_mv_slots: int = 3
     task_timeout_minutes: int = 30
 
+    # ── 各服务商每日调用上限 ──
+    daily_siliconflow_calls: int = 100
+    daily_openrouter_calls: int = 200
+
+    # ── OpenRouter 模型池（16 款免费模型按用途分组） ──
+    or_pool_long: str = (
+        "nemotron/nemotron-3-ultra:free,"
+        "nemotron/nemotron-3-super:free,"
+        "nemotron/nemotron-3-nano-30b-a3b:free,"
+        "nemotron/nemotron-nano-9b-v2:free,"
+        "google/gemma-4-26b-a4b:free"
+    )
+    or_pool_chat: str = (
+        "lagoon/laguna-m.1:free,"
+        "lagoon/laguna-s-2.1:free,"
+        "lagoon/laguna-xs-2.1:free,"
+        "ling/ling-3.0-flash:free"
+    )
+    or_pool_code: str = "cohere/command-r-code:free"
+    or_pool_multimodal: str = (
+        "nemotron/nemotron-3-nano-omni:free,"
+        "nemotron/nemotron-nano-12b-2-vl:free"
+    )
+    or_pool_embedding: str = "nemotron/nemotron-3-embed-1b:free"
+    or_pool_safety: str = "nemotron/nemotron-3.5-content-safety:free"
+    or_pool_rerank: str = "nvidia/llama-nemotron-rerank-vl-1b:free"
+    or_pool_other: str = "openai/gpt-oss-20b:free"
+
     @field_validator("allowed_origins")
     @classmethod
     def _strip_origins(cls, v: str) -> str:
@@ -62,6 +91,20 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> List[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    # ── 结构化模型池 ──
+    @property
+    def openrouter_model_pool(self) -> dict[str, list[str]]:
+        return {
+            "long": [m.strip() for m in self.or_pool_long.split(",") if m.strip()],
+            "chat": [m.strip() for m in self.or_pool_chat.split(",") if m.strip()],
+            "code": [m.strip() for m in self.or_pool_code.split(",") if m.strip()],
+            "multimodal": [m.strip() for m in self.or_pool_multimodal.split(",") if m.strip()],
+            "embedding": [m.strip() for m in self.or_pool_embedding.split(",") if m.strip()],
+            "safety": [m.strip() for m in self.or_pool_safety.split(",") if m.strip()],
+            "rerank": [m.strip() for m in self.or_pool_rerank.split(",") if m.strip()],
+            "other": [m.strip() for m in self.or_pool_other.split(",") if m.strip()],
+        }
 
 
 def get_settings() -> Settings:

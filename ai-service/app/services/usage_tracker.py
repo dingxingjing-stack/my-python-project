@@ -1,4 +1,4 @@
-"""每日生成次数限流 — 简化为纯计数系统。"""
+"""每日生成次数限流 — 简化为纯计数系统（支持双服务商独立额度）。"""
 from __future__ import annotations
 
 import uuid
@@ -9,6 +9,76 @@ from loguru import logger
 
 from app.config import get_settings
 from app.database import get_db
+
+# 有效服务商列表
+VALID_PROVIDERS = ("siliconflow", "openrouter")
+
+
+async def ensure_provider_table() -> None:
+    """确保 provider_daily_usage 表存在。"""
+    db = await get_db()
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS provider_daily_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            usage_date TEXT NOT NULL,
+            call_count INTEGER DEFAULT 0,
+            UNIQUE(provider, usage_date)
+        )
+    """)
+    await db.commit()
+
+
+async def ensure_provider_daily_reset(provider: str) -> dict:
+    """确保今日某服务商的用量记录存在。"""
+    assert provider in VALID_PROVIDERS, f"Unknown provider: {provider}"
+    today = date.today().isoformat()
+    db = await get_db()
+    await ensure_provider_table()
+
+    cur = await db.execute(
+        "SELECT * FROM provider_daily_usage WHERE provider = ? AND usage_date = ?",
+        (provider, today),
+    )
+    row = await cur.fetchone()
+    if row:
+        return dict(row)
+
+    await db.execute(
+        "INSERT INTO provider_daily_usage (provider, usage_date, call_count) VALUES (?, ?, 0)",
+        (provider, today),
+    )
+    await db.commit()
+    return {"provider": provider, "usage_date": today, "call_count": 0}
+
+
+async def check_provider_daily_limits(provider: str) -> dict:
+    """检查该服务商今日调用是否已达上限。"""
+    s = get_settings()
+    limit = (
+        s.daily_siliconflow_calls if provider == "siliconflow"
+        else s.daily_openrouter_calls
+    )
+    usage = await ensure_provider_daily_reset(provider)
+    if usage["call_count"] >= limit:
+        raise HTTPException(
+            429,
+            f"服务商 {provider} 今日调用已达上限（{limit} 次），请明日再试。",
+        )
+    return usage
+
+
+async def record_provider_usage(provider: str) -> None:
+    """记录一次服务商调用。"""
+    today = date.today().isoformat()
+    db = await get_db()
+    await db.execute(
+        "INSERT INTO provider_daily_usage (provider, usage_date, call_count) "
+        "VALUES (?, ?, 1) ON CONFLICT(provider, usage_date) "
+        "DO UPDATE SET call_count = call_count + 1",
+        (provider, today),
+    )
+    await db.commit()
 
 
 async def ensure_daily_reset(user_id: int) -> dict:

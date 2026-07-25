@@ -1,14 +1,17 @@
-"""AI 统一调度中间件 — 硅基流动 + OpenRouter 双免费模型对接。
+"""
+AI 统一调度中间件 — SiliconFlow + OpenRouter 双服务商，带降级链。
 
-任务-模型自动匹配规则：
-  text      → 硅基 Qwen/Qwen2.5-7B-Instruct       (歌词/文案/描述)
-  code      → 硅基 Qwen/Qwen2.5-Coder-7B-Instruct  (分镜批量/逻辑编排)
-  long      → OpenRouter nemotron-3-ultra:free      (超长上下文/深度推理)
-  code_alt  → OpenRouter cohere/command-r-code:free (代码调试/提示词优化)
-  vision    → OpenRouter nemotron-3-nano-omni:free  (图文识别/风格提示词)
+降级策略：
+  TEXT  → 硅基 Qwen2.5-7B-Instruct → OpenRouter lagoon/laguna-m.1:free
+  CODE  → 硅基 Qwen2.5-Coder-7B-Instruct → OpenRouter cohere/command-r-code:free
+  LONG  → OpenRouter nemotron-3-ultra:free  （仅 OR，无降级）
+  CODE_ALT → OpenRouter cohere/command-r-code:free（仅 OR，无降级）
+  VISION   → OpenRouter nemotron-3-nano-omni:free（仅 OR，无降级）
 
-三层架构：
-  前端业务层 → ai_scheduler(本模块) → 第三方 API
+服务商独立限额：
+  - 每次调用前检查对应服务商日配额（daily_siliconflow_calls / daily_openrouter_calls）
+  - 调用成功后记录 provider 用量
+  - 超出配额后抛出 429
 """
 from __future__ import annotations
 
@@ -28,21 +31,13 @@ from app.config import get_settings
 from app.database import get_db
 
 
-# ---------------------------------------------------------------------------
-# 任务类型枚举
-# ---------------------------------------------------------------------------
-
 class AITaskType(str, Enum):
-    TEXT = "text"          # 歌词、文案、描述
-    CODE = "code"          # 分镜批量生成、逻辑编排
-    LONG = "long"          # 超长上下文、深度推理
-    CODE_ALT = "code_alt"  # 代码调试、提示词优化
-    VISION = "vision"      # 图文多模态
+    TEXT = "text"
+    CODE = "code"
+    LONG = "long"
+    CODE_ALT = "code_alt"
+    VISION = "vision"
 
-
-# ---------------------------------------------------------------------------
-# 任务结果
-# ---------------------------------------------------------------------------
 
 @dataclass
 class AIResult:
@@ -50,16 +45,27 @@ class AIResult:
     data: dict[str, Any] = field(default_factory=dict)
     model_name: str = ""
     provider: str = ""
+    fallback_used: bool = False
     tokens_used: int = 0
     elapsed_ms: int = 0
 
 
-# ---------------------------------------------------------------------------
-# 调度器
-# ---------------------------------------------------------------------------
+class QuotaExceededError(Exception):
+    pass
+
+
+class AllProvidersFailedError(Exception):
+    pass
+
 
 class AIScheduler:
-    """统一 AI 调度中间件 — 自动匹配模型、限流、重试、扣费、日志。"""
+    """
+    统一 AI 调度中间件 — 自动匹配模型、限流、重试、降级、扣费、日志。
+
+    每个 TaskType 对应一组 (primary_provider, primary_model, fallback_provider, fallback_model)。
+    dispatch() 优先调用 primary；失败后自动降级到 fallback（若配置）。
+    每次调用前检查对应服务商的日配额，超出后抛出 429。
+    """
 
     def __init__(self) -> None:
         s = get_settings()
@@ -68,13 +74,33 @@ class AIScheduler:
         self._or_key = s.openrouter_api_key
         self._or_base = s.openrouter_base_url
 
-        # 模型映射
-        self._models = {
-            AITaskType.TEXT: (s.siliconflow_text_model, "siliconflow"),
-            AITaskType.CODE: (s.siliconflow_code_model, "siliconflow"),
-            AITaskType.LONG: (s.openrouter_long_model, "openrouter"),
-            AITaskType.CODE_ALT: (s.openrouter_code_model, "openrouter"),
-            AITaskType.VISION: (s.openrouter_vision_model, "openrouter"),
+        # 任务 → 路由映射，含降级
+        self._task_map: dict[AITaskType, dict] = {
+            AITaskType.TEXT: {
+                "primary": ("siliconflow", s.siliconflow_text_model),
+                "fallback": ("openrouter", s.openrouter_text_fallback),
+                "credit_action": "text",
+            },
+            AITaskType.CODE: {
+                "primary": ("siliconflow", s.siliconflow_code_model),
+                "fallback": ("openrouter", s.openrouter_code_model),
+                "credit_action": "code",
+            },
+            AITaskType.LONG: {
+                "primary": ("openrouter", s.openrouter_long_model),
+                "fallback": None,
+                "credit_action": "long",
+            },
+            AITaskType.CODE_ALT: {
+                "primary": ("openrouter", s.openrouter_code_model),
+                "fallback": None,
+                "credit_action": "code_alt",
+            },
+            AITaskType.VISION: {
+                "primary": ("openrouter", s.openrouter_vision_model),
+                "fallback": None,
+                "credit_action": "vision",
+            },
         }
 
         # 限流: 每个 provider 最多 5 并发
@@ -98,76 +124,129 @@ class AIScheduler:
         user_id: int = 1,
         job_id: Optional[str] = None,
         request_id: Optional[str] = None,
+        disable_fallback: bool = False,
     ) -> AIResult:
-        """统一调度入口 — 幂等检查 → 状态机 → 限额检查 → API调用 → 记录用量。"""
+        """
+        统一调度入口 — 自动降级、幂等检查、状态机、限额检查、双 Provider 限流。
+
+        参数:
+          disable_fallback: True 时只尝试 primary，不降级。
+        """
         from app.services.task_state_machine import (
             create_task, transition, update_task_output, TaskStatus,
         )
         from app.services.usage_tracker import (
             check_daily_limits, record_usage, generate_task_id,
+            check_provider_daily_limits, record_provider_usage,
         )
         from app.services.idempotency import check_idempotency, register_idempotency
 
-        model_name, provider = self._models.get(task_type, self._models[AITaskType.TEXT])
-        result = AIResult(model_name=model_name, provider=provider)
+        route = self._task_map.get(task_type, self._task_map[AITaskType.TEXT])
+        action = credit_action or route.get("credit_action", "")
+
+        result = AIResult()
         t0 = time.monotonic()
 
+        # 幂等检查
         if request_id:
             cached = await check_idempotency(request_id, user_id)
             if cached:
                 logger.info("[Dispatch] Idempotent hit: request_id={}", request_id)
-                return AIResult(text=cached.get("text", ""), model_name=model_name, provider=provider)
+                return AIResult(text=cached.get("text", ""), model_name=route["primary"][1], provider=route["primary"][0])
 
-        action = credit_action or ""
+        # 用户每日总限额
         await check_daily_limits(user_id, action)
 
+        # 生成任务 ID
         tid = job_id or generate_task_id()
         await create_task(
             user_id=user_id, task_type=action or task_type.value, task_id=tid,
             request_id=request_id,
             input_data=json.dumps(messages, ensure_ascii=False)[:5000],
-            model_name=model_name, provider=provider,
+            model_name=route["primary"][1], provider=route["primary"][0],
         )
-
         await transition(tid, TaskStatus.PROCESSING)
 
-        try:
-            sem = self._semaphores.get(provider, asyncio.Semaphore(5))
-            async with sem:
-                text = await self._call_with_retry(provider, model_name, messages, temperature, max_tokens)
+        # 主 + 降级调用链
+        text, model_name, provider, fallback_used = await self._call_chain(
+            route=route,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            disable_fallback=disable_fallback,
+        )
 
-            result.text = text
-            result.elapsed_ms = int((time.monotonic() - t0) * 1000)
+        result.text = text
+        result.model_name = model_name
+        result.provider = provider
+        result.fallback_used = fallback_used
+        result.elapsed_ms = int((time.monotonic() - t0) * 1000)
 
-            await update_task_output(tid, text[:5000])
-            await transition(tid, TaskStatus.COMPLETED)
-            await record_usage(user_id, action, 0)
+        # 写入结果
+        await update_task_output(tid, text[:5000])
+        await transition(tid, TaskStatus.COMPLETED)
+        await record_usage(user_id, action, 0)
 
-            if request_id:
-                await register_idempotency(request_id, user_id, tid, {"text": text[:2000], "task_id": tid})
+        # 记录该 provider 的调用次数
+        await record_provider_usage(provider)
 
-            await self._log_job(
-                job_id=tid, task_type=task_type.value, model=model_name, provider=provider,
-                input_data=json.dumps(messages, ensure_ascii=False)[:5000],
-                output_data=text[:5000], credits_used=0,
-                elapsed_ms=result.elapsed_ms, status="completed",
-            )
+        if request_id:
+            await register_idempotency(request_id, user_id, tid, {"text": text[:2000], "task_id": tid})
 
-        except HTTPException:
-            await transition(tid, TaskStatus.FAILED, error="HTTP error")
-            raise
-        except Exception as exc:
-            result.elapsed_ms = int((time.monotonic() - t0) * 1000)
-            await transition(tid, TaskStatus.FAILED, error=str(exc)[:500])
-            await self._log_job(
-                job_id=tid, task_type=task_type.value, model=model_name, provider=provider,
-                input_data=json.dumps(messages, ensure_ascii=False)[:5000],
-                output_data="", credits_used=0, elapsed_ms=result.elapsed_ms,
-                status="failed", error=str(exc)[:500],
-            )
-            raise
+        await self._log_job(
+            job_id=tid, task_type=task_type.value, model=model_name, provider=provider,
+            input_data=json.dumps(messages, ensure_ascii=False)[:5000],
+            output_data=text[:5000], credits_used=0,
+            elapsed_ms=result.elapsed_ms, status="completed",
+        )
 
         return result
+
+    async def _call_chain(
+        self,
+        route: dict,
+        messages: list[dict],
+        temperature: float,
+        max_tokens: int,
+        disable_fallback: bool = False,
+    ) -> tuple[str, str, str, bool]:
+        """
+        按降级链依次尝试: primary → fallback。
+        返回 (text, model_name, provider, fallback_used)。
+        """
+        from app.services.usage_tracker import check_provider_daily_limits
+
+        attempts = [("primary", route["primary"])]
+        if not disable_fallback and route.get("fallback"):
+            attempts.append(("fallback", route["fallback"]))
+
+        last_exception: Optional[Exception] = None
+
+        for stage, (provider, model) in attempts:
+            # 检查该服务商当日配额
+            try:
+                await check_provider_daily_limits(provider)
+            except HTTPException as exc:
+                logger.warning("[{}] {} 配额不足: {}", stage, provider, exc.detail)
+                last_exception = exc
+                continue
+
+            try:
+                sem = self._semaphores.get(provider, asyncio.Semaphore(5))
+                async with sem:
+                    text = await self._call_with_retry(provider, model, messages, temperature, max_tokens)
+                logger.info("[{}] {} 调用成功, model={}", stage, provider, model)
+                fallback_used = stage == "fallback"
+                return text, model, provider, fallback_used
+            except Exception as exc:
+                logger.warning("[{}] {} 调用失败: {} -> {}", stage, provider, type(exc).__name__, exc)
+                last_exception = exc
+                continue
+
+        # 全部失败
+        err_msg = f"所有引擎均不可用: {last_exception}" if last_exception else "无可用引擎"
+        logger.error("[_call_chain] {}", err_msg)
+        raise AllProvidersFailedError(err_msg)
 
     # ------------------------------------------------------------------
     # 便捷方法
@@ -182,7 +261,6 @@ class AIScheduler:
         vocal: str = "auto",
         user_id: int = 1,
     ) -> AIResult:
-        """歌词生成 — 使用硅基 Qwen2.5-7B-Instruct。"""
         system = """You are a professional songwriter. Write emotionally engaging, singable lyrics.
 Always return in this format:
 
@@ -235,7 +313,6 @@ LRC:
         title: str = "",
         user_id: int = 1,
     ) -> AIResult:
-        """用代码模型解析歌词，生成音频生成专用提示词。"""
         system = "You are a music production assistant. Given lyrics and style, generate a detailed prompt for AI music generation (Suno-compatible). Output ONLY the prompt text, max 200 words."
         user_msg = f"Title: {title}\nStyle: {style}\n\nLyrics:\n{lyrics}"
 
@@ -244,7 +321,7 @@ LRC:
             [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
             temperature=0.5,
             max_tokens=500,
-            credit_action=None,  # 不单独扣费
+            credit_action=None,
             user_id=user_id,
         )
 
@@ -255,7 +332,6 @@ LRC:
         style: str = "Cinematic",
         user_id: int = 1,
     ) -> AIResult:
-        """用视觉模型生成封面绘图提示词。"""
         system = "You are a visual artist. Given a song title and lyrics, generate a detailed image generation prompt for creating album cover art. Style: {style}. Output ONLY the image prompt, max 100 words."
         user_msg = f"Song: {title}\nStyle: {style}\n\nLyrics excerpt:\n{lyrics[:500]}"
 
@@ -276,7 +352,6 @@ LRC:
         num_scenes: int = 4,
         user_id: int = 1,
     ) -> AIResult:
-        """MV 全流程第一步：生成完整故事剧本 + 分镜。"""
         system = f"""You are a music video director. Given song lyrics, create a complete MV storyboard.
 Output exactly {num_scenes} scenes. For each scene provide:
 1. Scene number
@@ -316,7 +391,6 @@ MV Style: {mv_style}"""
         style: str = "Cinematic",
         user_id: int = 1,
     ) -> AIResult:
-        """为单个分镜生成图片描述（实际图片生成需要图像模型）。"""
         system = "You are an AI image prompt enhancer. Take the given image prompt and enhance it for high-quality image generation. Keep it under 150 words. Output ONLY the enhanced prompt."
         user_msg = f"Style: {style}\n\nOriginal prompt: {image_prompt}"
 
@@ -336,7 +410,6 @@ MV Style: {mv_style}"""
         lyrics_snippet: str,
         user_id: int = 1,
     ) -> AIResult:
-        """生成分享卡片文案。"""
         system = "You are a social media copywriter. Write a short, engaging share text for an AI-generated song. Max 50 words. Include a call to action."
         user_msg = f"Song: {title}\nStyle: {style}\nLyrics: {lyrics_snippet[:200]}"
 
@@ -357,7 +430,6 @@ MV Style: {mv_style}"""
         instruments: str = "",
         user_id: int = 1,
     ) -> AIResult:
-        """用 Nemotron 生成配器描述 + 伴奏参数，供本地开源工具合成。"""
         system = """You are a music producer. Given lyrics and style, output a standardized music production spec.
 Use this exact JSON format:
 {
@@ -391,10 +463,6 @@ Output ONLY valid JSON, no markdown."""
         num_images: int = 1,
         user_id: int = 1,
     ) -> AIResult:
-        """使用硅基流动 SDXL 模型生成图片。
-        
-        返回 AIResult，data 中包含 image_urls 列表。
-        """
         if not self._sf_key:
             raise RuntimeError("SiliconFlow API key 未配置")
 
@@ -428,7 +496,6 @@ Output ONLY valid JSON, no markdown."""
         result.elapsed_ms = int((time.monotonic() - t0) * 1000)
         result.text = f"Generated {num_images} image(s) via SDXL"
 
-        # 保存图片到本地存储
         storage = get_local_storage()
         image_urls = []
         for img_data in data.get("data", []):
@@ -538,7 +605,6 @@ Output ONLY valid JSON, no markdown."""
         status: str,
         error: str = "",
     ) -> None:
-        """写入 generation_jobs 日志表。"""
         try:
             db = await get_db()
             await db.execute(
