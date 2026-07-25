@@ -1,125 +1,233 @@
-"""AI 音频生成路由 — V2.0 纯本地方案（无 Suno）。
-
-Nemotron 生成配器描述 → SoVITS 生成人声 → 返回音频 URL。
 """
-from __future__ import annotations
+AI 音乐生成路由
 
+降级链：Mureka -> HF (Hugging Face MusicGen) -> Mock
+通过环境变量 HF_FALLBACK (默认 true) 控制是否启用 HF 兜底。
+MOCK_FALLBACK (默认 true) 控制最终是否返回示例音频。
+"""
+
+import os
 import uuid
-
-from fastapi import APIRouter, HTTPException, Request
-
-from app.database import get_db
-from app.services.ai_scheduler import get_scheduler
-from app.services.sovits_engine import get_sovits_engine
+import httpx
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+from app.services.mureka_service import mureka_service, MurekaSongRequest, QuotaExceededError
+from app.services.agnes_music_service import agnes_service, AgnesSongRequest
 
 router = APIRouter(prefix="/ai", tags=["ai-music"])
 
+HF_FALLBACK_ENABLED = os.getenv("HF_FALLBACK", "true").lower() in ("1", "true", "yes")
+MOCK_FALLBACK_ENABLED = os.getenv("MOCK_FALLBACK", "true").lower() in ("1", "true", "yes")
 
-@router.post("/music/generate")
-async def generate_music(req: dict, request: Request):
-    """歌曲音频生成 — Nemotron 配器 + SoVITS 人声，扣 5 Credits。"""
-    user_id = req.get("user_id", 1)
-    lyrics_id = req.get("lyrics_id")
-    lyrics_text = req.get("lyrics", "")
-    style = req.get("style", "pop")
-    title = req.get("title", "")
-    creation_id = req.get("creation_id")
-    voice = req.get("voice", "default")
+_http_client: Optional[httpx.AsyncClient] = None
+_cdn_uploader: Optional["CDNUploader"] = None
 
-    if not lyrics_text:
-        raise HTTPException(400, "Missing lyrics")
 
-    scheduler = get_scheduler()
-    sovits = get_sovits_engine()
-    job_id = str(uuid.uuid4())[:8]
+async def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=120.0)
+    return _http_client
 
-    db = await get_db()
-    await db.execute(
-        "INSERT INTO generation_jobs (job_id, user_id, task_type, status) VALUES (?, ?, ?, ?)",
-        (job_id, user_id, "music", "processing"),
-    )
-    await db.commit()
 
+async def _get_cdn_uploader():
+    global _cdn_uploader
+    if _cdn_uploader is None:
+        from app.services.cdn_uploader import CDNUploader
+        _cdn_uploader = CDNUploader()
+    return _cdn_uploader
+
+
+async def _try_hf_fallback(prompt: str, duration: Optional[int]) -> Optional[str]:
+    if not HF_FALLBACK_ENABLED:
+        print("[HF 兜底] HF_FALLBACK 未启用，跳过")
+        return None
+
+    hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
+    if not hf_token:
+        print("[HF 兜底] 未配置 HF_TOKEN / HUGGINGFACE_TOKEN，跳过")
+        return None
+
+    tmp_path = None
     try:
-        # Step 1: Nemotron 生成配器描述
-        accompaniment = None
+        api_url = "https://api-inference.huggingface.co/models/facebook/musicgen-large"
+        headers = {"Authorization": f"Bearer {hf_token}"}
+        payload = {"inputs": prompt}
+        if duration:
+            payload["parameters"] = {"max_new_tokens": int(duration * 50)}
+
+        client = await _get_http_client()
+        response = await client.post(api_url, headers=headers, json=payload)
+
+        if response.status_code != 200:
+            truncated = response.text[:200]
+            print(f"[HF 兜底] API 错误 {response.status_code}: {truncated}")
+            return None
+
+        audio_data = response.content
+        if not audio_data:
+            print("[HF 兜底] API 返回空数据")
+            return None
+
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp.write(audio_data)
+            tmp.flush()
+            tmp_path = tmp.name
+
+        uploader = await _get_cdn_uploader()
+        cdn_url = await uploader.upload_audio(tmp_path)
+        if cdn_url:
+            return cdn_url
+        print("[HF 兜底] CDN 上传失败")
+        return None
+
+    except Exception as e:
+        print(f"[HF 兜底] 异常: {type(e).__name__}: {e}")
+        return None
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+class GenerateRequest(BaseModel):
+    prompt: str
+    style: str = "pop"
+    duration: Optional[int] = None
+    type: str = "song"
+
+
+class GenerateResponse(BaseModel):
+    success: bool
+    audio_url: Optional[str] = None
+    error: Optional[str] = None
+    task_id: Optional[str] = None
+    ai_provider: Optional[str] = None
+    agnes_debug: Optional[str] = None
+
+
+@router.post("/generate", response_model=GenerateResponse)
+async def generate_music(request: GenerateRequest):
+    try:
+        prompt = request.prompt.strip()
+        if len(prompt) < 5:
+            raise HTTPException(status_code=400, detail="提示词至少需要 5 个字符")
+
+        task_suffix = uuid.uuid4().hex[:6]
+
+        # ── 1. Agnes 优化提示词 + 生成歌词 ──
+        print(f"[generate] 第 1 层: Agnes 优化提示词...")
+        agnes_request = AgnesSongRequest(
+            prompt=prompt,
+            style=request.style,
+            duration=request.duration or 180,
+            type=request.type,
+        )
+        agnes_result = await agnes_service.generate_song(agnes_request)
+
+        ai_provider = "agnes" if agnes_result.optimized_prompt and agnes_result.optimized_prompt != prompt else "gemini"
+        agnes_debug = (
+            f"success={agnes_result.success}, "
+            f"opt_changed={'yes' if agnes_result.optimized_prompt != prompt else 'no'}, "
+            f"error={agnes_result.error}, "
+            f"key_set={bool(agnes_service.API_KEY)}"
+        )
+
+        final_prompt = agnes_result.optimized_prompt or prompt
+        if agnes_result.generated_lyrics:
+            final_prompt = agnes_result.generated_lyrics
+
+        # ── 2. Mureka 生成音频 ──
+        print(f"[generate] 第 2 层: Mureka 生成音频...")
+        mureka_request = MurekaSongRequest(
+            lyrics=final_prompt,
+            style=request.style,
+            duration=request.duration,
+        )
         try:
-            accompaniment = await scheduler.generate_accompaniment(
-                lyrics=lyrics_text, style=style, user_id=user_id,
+            mureka_result = await mureka_service.generate_song(mureka_request)
+            if mureka_result.success:
+                return GenerateResponse(
+                    success=True,
+                    audio_url=mureka_result.audio_url,
+                    task_id=mureka_result.task_id,
+                    ai_provider=f"{ai_provider}+mureka",
+                    agnes_debug=agnes_debug,
+                )
+        except QuotaExceededError:
+            print("[降级] Mureka 配额耗尽 → HF")
+        except Exception as e:
+            print(f"[降级] Mureka 异常: {e} → HF")
+
+        # ── 3. HF 兜底 ──
+        print(f"[generate] 第 3 层: HF MusicGen 兜底...")
+        hf_audio = await _try_hf_fallback(prompt=final_prompt, duration=request.duration)
+        if hf_audio:
+            return GenerateResponse(
+                success=True,
+                audio_url=hf_audio,
+                task_id=f"hf-{hash(final_prompt) & 0xffffff:06x}-{task_suffix}",
+                ai_provider=f"{ai_provider}+hf",
+                agnes_debug=agnes_debug,
             )
-        except Exception:
-            pass
 
-        # Step 2: SoVITS 生成人声干声
-        vocal_text = _extract_lyrics_only(lyrics_text) or lyrics_text
-        audio_url = await sovits.generate_vocal(
-            text=vocal_text[:1000],
-            voice=voice,
-            language=req.get("language", "zh"),
-        )
-
-        # Step 3: 存入 songs 表
-        song_id = None
-        if creation_id:
-            cur = await db.execute(
-                "INSERT INTO songs (creation_id, lyrics_id, user_id, version, title, audio_url, style_tags, model_name, generation_prompt) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)",
-                (creation_id, lyrics_id or 0, user_id, title or "Untitled", audio_url, style, accompaniment.model_name if accompaniment else "sovits-local", (accompaniment.text or "")[:500] if accompaniment else ""),
+        # ── 4. Mock 兜底 ──
+        if not MOCK_FALLBACK_ENABLED:
+            print("[generate] 所有引擎失败，MOCK_FALLBACK 未启用，返回错误")
+            return GenerateResponse(
+                success=False,
+                error="所有 AI 引擎均不可用，且 MOCK 已被关闭",
+                ai_provider="none",
+                agnes_debug=agnes_debug,
             )
-            song_id = cur.lastrowid
 
-        await db.execute(
-            "UPDATE generation_jobs SET status='completed', model_name=?, elapsed_ms=? WHERE job_id=?",
-            (accompaniment.model_name if accompaniment else "sovits-local", 0, job_id),
+        print(f"[generate] 第 4 层: Mock 示例音频兜底")
+        import random
+        mock_urls = [
+            "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+            "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+            "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+        ]
+        return GenerateResponse(
+            success=True,
+            audio_url=random.choice(mock_urls),
+            task_id=f"mock-{hash(prompt) & 0xffffff:06x}-{task_suffix}",
+            ai_provider=f"{ai_provider}+mock",
+            agnes_debug=agnes_debug,
         )
-        await db.commit()
 
-        return {
-            "success": True,
-            "data": {
-                "job_id": job_id,
-                "song_id": song_id,
-                "audio_url": audio_url,
-                "title": title or "Untitled",
-                "model": accompaniment.model_name if accompaniment else "sovits-local",
-                "music_production": accompaniment.text if accompaniment else None,
-            },
-        }
-
-    except Exception as exc:
-        await db.execute(
-            "UPDATE generation_jobs SET status='failed', error_message=? WHERE job_id=?",
-            (str(exc)[:500], job_id),
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"[generate 未捕获] {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return GenerateResponse(
+            success=False,
+            error=f"{type(e).__name__}: {e}",
+            ai_provider="error",
+            agnes_debug="",
         )
-        await db.commit()
-        raise HTTPException(500, f"Music generation failed: {exc}")
 
 
-@router.get("/music/{song_id}")
-async def get_song(song_id: int):
-    """获取单首歌曲记录。"""
-    db = await get_db()
-    cur = await db.execute("SELECT * FROM songs WHERE id = ?", (song_id,))
-    row = await cur.fetchone()
-    if not row:
-        raise HTTPException(404, "Song not found")
-    return {"success": True, "data": dict(row)}
-
-
-@router.get("/music/list/{creation_id}")
-async def list_songs(creation_id: int):
-    """获取某作品的所有歌曲版本。"""
-    db = await get_db()
-    cur = await db.execute(
-        "SELECT * FROM songs WHERE creation_id = ? ORDER BY version",
-        (creation_id,),
-    )
-    rows = await cur.fetchall()
-    return {"success": True, "data": [dict(r) for r in rows]}
-
-
-def _extract_lyrics_only(text: str) -> str:
-    import re
-    text = re.sub(r"LRC:\s*[\s\S]+", "", text)
-    text = re.sub(r"Title:.*", "", text)
-    text = re.sub(r"(Verse|Chorus|Bridge|Intro|Outro)\s*\d*:", "", text)
-    return text.strip()
+@router.get("/styles")
+async def list_styles():
+    return {
+        "styles": [
+            {"value": "pop", "label": "流行", "description": "主流流行音乐"},
+            {"value": "rock", "label": "摇滚", "description": "摇滚乐"},
+            {"value": "electronic", "label": "电子", "description": "电子音乐"},
+            {"value": "hip-hop", "label": "嘻哈", "description": "嘻哈/说唱"},
+            {"value": "r&b", "label": "R&B", "description": "节奏布鲁斯"},
+            {"value": "jazz", "label": "爵士", "description": "爵士乐"},
+            {"value": "classical", "label": "古典", "description": "古典音乐"},
+            {"value": "ambient", "label": "氛围", "description": "氛围音乐"},
+            {"value": "cinematic", "label": "电影配乐", "description": "电影原声"},
+            {"value": "lo-fi", "label": "Lo-Fi", "description": "低保真音乐"},
+        ]
+    }
