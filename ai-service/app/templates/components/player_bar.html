@@ -1,0 +1,137 @@
+<!-- 【新增代码】底部播放器 — 支持实际音频播放 -->
+<div id="player-bar" class="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 px-6 py-3 flex items-center gap-4 z-40"
+     x-data="playerBar()" x-init="initPlayer()">
+  <!-- 封面 + 标题 -->
+  <div class="flex items-center gap-3 flex-1 min-w-0">
+    <div class="w-10 h-10 bg-gray-700 rounded flex items-center justify-center flex-shrink-0">
+      <img x-show="coverUrl" :src="coverUrl" class="w-10 h-10 rounded object-cover" alt="">
+      <span x-show="!coverUrl" class="text-lg">🎵</span>
+    </div>
+    <div class="min-w-0">
+      <p class="text-sm font-semibold text-gray-100 truncate" x-text="title || 'No track playing'"></p>
+      <p class="text-xs text-gray-500 truncate" x-text="subtitle || 'Select a track to start listening'"></p>
+    </div>
+  </div>
+
+  <!-- 控制按钮 -->
+  <div class="flex items-center gap-3">
+    <button @click="seekBackward()" class="text-gray-400 hover:text-white transition text-lg" title="后退10秒">⏮</button>
+    <button @click="togglePlay()" class="text-purple-400 hover:text-purple-300 transition text-2xl" x-text="isPlaying ? '⏸' : '▶'"></button>
+    <button @click="seekForward()" class="text-gray-400 hover:text-white transition text-lg" title="快进10秒">⏭</button>
+  </div>
+
+  <!-- 进度条 -->
+  <div class="w-48 md:w-64 flex items-center gap-2">
+    <span class="text-xs text-gray-500 w-10 text-right" x-text="formatTime(currentTime)"></span>
+    <div class="flex-1 h-1 bg-gray-700 rounded-full cursor-pointer group" @click="seek($event)">
+      <div class="h-1 bg-purple-500 rounded-full relative transition-all" :style="`width: ${progress}%`">
+        <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-purple-400 rounded-full opacity-0 group-hover:opacity-100 transition"></div>
+      </div>
+    </div>
+    <span class="text-xs text-gray-500 w-10" x-text="formatTime(duration)"></span>
+  </div>
+
+  <!-- 音量 -->
+  <div class="hidden md:flex items-center gap-2 w-24">
+    <span class="text-gray-400 text-sm" x-text="volume > 0 ? '🔊' : '🔇'" @click="toggleMute()"></span>
+    <input type="range" min="0" max="100" :value="volume * 100" @input="setVolume($event.target.value / 100)"
+           class="w-full h-1 bg-gray-700 rounded-full appearance-none cursor-pointer accent-purple-500">
+  </div>
+
+  <!-- 隐藏的 audio 元素 -->
+  <audio id="global-audio-player" x-ref="audio"
+         @timeupdate="currentTime = $refs.audio.currentTime"
+         @loadedmetadata="duration = $refs.audio.duration"
+         @ended="isPlaying = false"
+         @play="isPlaying = true"
+         @pause="isPlaying = false"></audio>
+</div>
+
+<script>
+  function playerBar() {
+    return {
+      title: '',
+      subtitle: '',
+      coverUrl: '',
+      isPlaying: false,
+      currentTime: 0,
+      duration: 0,
+      volume: 0.8,
+      progress: 0,
+
+      initPlayer() {
+        // 监听全局播放事件（从作品页、创建页等触发）
+        window.addEventListener('play-track', (e) => {
+          const { title, audio_url, cover_url } = e.detail;
+          this.loadAndPlay(title, audio_url, cover_url);
+        });
+
+        // 进度定时更新
+        setInterval(() => {
+          const audio = this.$refs.audio;
+          if (audio && audio.duration) {
+            this.progress = (audio.currentTime / audio.duration) * 100;
+          }
+        }, 500);
+      },
+
+      loadAndPlay(title, audioUrl, coverUrl) {
+        if (!audioUrl) return;
+        const audio = this.$refs.audio;
+        this.title = title || 'Unknown';
+        this.coverUrl = coverUrl || '';
+        this.subtitle = coverUrl ? 'AI Generated' : 'Playing...';
+        audio.src = audioUrl;
+        audio.volume = this.volume;
+        audio.play().then(() => {
+          this.isPlaying = true;
+        }).catch(e => console.warn('Play failed:', e));
+      },
+
+      togglePlay() {
+        const audio = this.$refs.audio;
+        if (!audio.src) return;
+        if (this.isPlaying) { audio.pause(); } else { audio.play(); }
+      },
+
+      seekForward() {
+        const audio = this.$refs.audio;
+        audio.currentTime = Math.min(audio.currentTime + 10, audio.duration);
+      },
+
+      seekBackward() {
+        const audio = this.$refs.audio;
+        audio.currentTime = Math.max(audio.currentTime - 10, 0);
+      },
+
+      seek(event) {
+        const audio = this.$refs.audio;
+        if (!audio.duration) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const pct = (event.clientX - rect.left) / rect.width;
+        audio.currentTime = pct * audio.duration;
+      },
+
+      setVolume(val) {
+        this.volume = val;
+        this.$refs.audio.volume = val;
+      },
+
+      toggleMute() {
+        if (this.volume > 0) {
+          this._prevVolume = this.volume;
+          this.setVolume(0);
+        } else {
+          this.setVolume(this._prevVolume || 0.8);
+        }
+      },
+
+      formatTime(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return m + ':' + s.toString().padStart(2, '0');
+      },
+    };
+  }
+</script>

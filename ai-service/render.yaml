@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: avireon-ai-service
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash start.sh
+    envVars:
+      - key: SERVICE_HOST
+        value: "0.0.0.0"
+      - key: SERVICE_PORT
+        value: "10000"
+      - key: INTERNAL_API_TOKEN
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: SILICONFLOW_API_KEY
+        sync: false
+      - key: SILICONFLOW_BASE_URL
+        value: "https://api.siliconflow.cn/v1"
+      - key: SILICONFLOW_TEXT_MODEL
+        value: "Qwen/Qwen2.5-7B-Instruct"
+      - key: SILICONFLOW_CODE_MODEL
+        value: "Qwen/Qwen2.5-Coder-7B-Instruct"
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_BASE_URL
+        value: "https://openrouter.ai/api/v1"
+      - key: OPENROUTER_LONG_MODEL
+        value: "nvidia/nemotron-3-ultra:free"
+      - key: OPENROUTER_CODE_MODEL
+        value: "cohere/command-r-code:free"
+      - key: OPENROUTER_VISION_MODEL
+        value: "nvidia/nemotron-3-nano-omni:free"
+      - key: DAILY_FREE_CREDITS
+        value: "10"
+      - key: DAILY_MAX_AI_CALLS
+        value: "10"
+      - key: DAILY_GLOBAL_MAX_CALLS
+        value: "200"
+      - key: DAILY_MV_SLOTS
+        value: "3"
+      - key: REFERRAL_REWARD_CREDITS
+        value: "10"
+      - key: REFERRAL_DAILY_REWARD_LIMIT
+        value: "5"
+      - key: TASK_TIMEOUT_MINUTES
+        value: "30"
+      - key: LOCAL_UPLOADS_DIR
+        value: "data/uploads"

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Settings') }} — Avireon{% endblock %}
+{% block head %}
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>[x-cloak] { display: none !important; }</style>
+{% endblock %}
+{% block content %}
+<div x-data="settings()">
+  <main class="flex-1 max-w-3xl mx-auto w-full px-6 py-8">
+    <h1 class="text-3xl font-bold mb-8">{{ _('Settings') }}</h1>
+
+    <!-- Account -->
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-4">{{ _('Account') }}</h2>
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 space-y-4">
+        <div>
+          <label class="text-sm text-gray-400 block mb-1">{{ _('Email') }}</label>
+          <input x-model="form.email" type="email" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 block mb-1">{{ _('Username') }}</label>
+          <input x-model="form.username" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 block mb-1">{{ _('Avatar') }}</label>
+          <div class="flex items-center gap-4">
+            <div class="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-2xl text-gray-500">U</div>
+            <button class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm transition">{{ _('Upload Avatar') }}</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Language -->
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-4">{{ _('Language') }}</h2>
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        <select x-model="form.language" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+          <option value="en">{{ _('English') }}</option>
+          <option value="zh">{{ _('简体中文') }}</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Generation Defaults -->
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-4">{{ _('Generation Defaults') }}</h2>
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 space-y-4">
+        <div>
+          <label class="text-sm text-gray-400 block mb-1">{{ _('Default Song Language') }}</label>
+          <select x-model="form.default_song_language" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+            <option value="auto">{{ _('Auto Detect') }}</option>
+            <option value="zh">{{ _('中文') }}</option>
+            <option value="en">{{ _('English') }}</option>
+            <option value="ja">{{ _('日本語') }}</option>
+            <option value="ko">{{ _('한국어') }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 block mb-1">{{ _('Default Genre') }}</label>
+          <select x-model="form.default_genre" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+            <option value="pop">{{ _('Pop') }}</option>
+            <option value="rock">{{ _('Rock') }}</option>
+            <option value="electronic">{{ _('Electronic') }}</option>
+            <option value="hiphop">{{ _('Hip Hop') }}</option>
+            <option value="r&b">{{ _('R&B') }}</option>
+            <option value="folk">{{ _('Folk') }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 block mb-1">{{ _('Default Vocal') }}</label>
+          <select x-model="form.default_vocal" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+            <option value="auto">{{ _('Auto') }}</option>
+            <option value="male">{{ _('Male') }}</option>
+            <option value="female">{{ _('Female') }}</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Privacy -->
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-4">{{ _('Privacy') }}</h2>
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        <label class="text-sm text-gray-400 block mb-2">{{ _('Default Privacy for New Creations') }}</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="radio" x-model="form.default_privacy" value="public" class="accent-purple-500">
+            <div>
+              <span class="text-white">{{ _('Public') }}</span>
+              <p class="text-xs text-gray-500">{{ _('Everyone can see in Explore') }}</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="radio" x-model="form.default_privacy" value="unlisted" class="accent-purple-500">
+            <div>
+              <span class="text-white">{{ _('Unlisted') }}</span>
+              <p class="text-xs text-gray-500">{{ _('Only people with the link can see') }}</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="radio" x-model="form.default_privacy" value="private" class="accent-purple-500">
+            <div>
+              <span class="text-white">{{ _('Private') }}</span>
+              <p class="text-xs text-gray-500">{{ _('Only you can see') }}</p>
+            </div>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Referral -->
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-4">{{ _('Invite Friends') }}</h2>
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        <p class="text-gray-400 text-sm mb-3">{{ _('Share your referral link. When your friend creates their first song, you both get 10 credits!') }}</p>
+        <div class="flex items-center gap-2">
+          <input :value="referralLink" readonly class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300">
+          <button @click="copyReferral()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition">
+            <span x-text="copied ? 'Copied!' : 'Copy'"></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Save -->
+    <button @click="save()" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-8 py-3 rounded-xl font-semibold transition">
+      <span x-text="saving ? 'Saving...' : 'Save Settings'"></span>
+    </button>
+    <span x-show="saved" class="ml-3 text-green-400 text-sm">{{ _('Settings saved!') }}</span>
+  </main>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  function settings() {
+    return {
+      form: {
+        email: '',
+        username: '',
+        language: 'en',
+        default_song_language: 'auto',
+        default_genre: 'pop',
+        default_vocal: 'auto',
+        default_privacy: 'public',
+      },
+      saving: false,
+      saved: false,
+      copied: false,
+      referralLink: window.location.origin + '/invite/user123',
+
+      async save() {
+        this.saving = true;
+        this.saved = false;
+        try {
+          await fetch('/api/v1/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.form),
+          });
+          this.saved = true;
+          setTimeout(() => this.saved = false, 3000);
+        } catch (e) { console.error(e); }
+        this.saving = false;
+      },
+
+      copyReferral() {
+        navigator.clipboard.writeText(this.referralLink);
+        this.copied = true;
+        setTimeout(() => this.copied = false, 2000);
+      },
+    };
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,668 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Create — Avireon') }}{% endblock %}
+{% block content %}
+<div x-data="wizard()" x-init="init()" class="flex-1 flex flex-col">
+
+  <!-- 每日生成次数展示条 -->
+  <div class="bg-gray-900 border-b border-gray-800 px-4 py-2">
+    <div class="max-w-7xl mx-auto flex items-center gap-6 text-sm">
+      <div class="flex items-center gap-2">
+        <span class="text-gray-400">{{ _('今日生成:') }}</span>
+        <span class="text-purple-400 font-medium" x-text="(usageInfo?.ai_calls_count ?? 0) + '/' + (usageInfo?.ai_calls_limit ?? 10)"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-gray-400">{{ _('MV:') }}</span>
+        <span class="text-pink-400 font-medium" x-text="(usageInfo?.mv_count ?? 0) + '/' + (usageInfo?.mv_limit ?? 3)"></span>
+      </div>
+      <div class="flex items-center gap-2 ml-auto">
+        <span class="text-gray-400">{{ _('全局:') }}</span>
+        <span class="text-green-400 font-medium" x-text="(usageInfo?.global_calls_today ?? 0) + '/' + (usageInfo?.global_limit ?? 200)"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 弹窗提示 -->
+  <div x-show="showModal" x-transition class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" @click.self="showModal = false">
+    <div class="bg-gray-900 rounded-2xl p-6 max-w-md w-full border border-gray-700">
+      <h3 class="text-lg font-bold mb-2" x-text="modalTitle"></h3>
+      <p class="text-gray-400 text-sm mb-4" x-text="modalMessage"></p>
+      <button @click="showModal = false" class="w-full bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-xl transition">{{ _('知道了') }}</button>
+    </div>
+  </div>
+
+  <div class="flex-1 flex flex-col lg:flex-row max-w-7xl mx-auto w-full">
+    <!-- Left Panel: Settings -->
+    <div class="lg:w-[420px] xl:w-[480px] border-r border-gray-800 p-6 overflow-y-auto">
+      <!-- Step Indicator -->
+      <div class="flex items-center gap-2 mb-8">
+        <template x-for="(s, i) in steps" :key="i">
+          <div class="flex items-center gap-2">
+            <button @click="goToStep(i)" :class="step >= i ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-500'"
+                    class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition">
+              <span x-text="i + 1"></span>
+            </button>
+            <div x-show="i < steps.length - 1" class="w-8 h-0.5" :class="step > i ? 'bg-purple-600' : 'bg-gray-800'"></div>
+          </div>
+        </template>
+        <span class="ml-3 text-sm text-gray-400" x-text="steps[step]"></span>
+        <span x-show="templateName" class="ml-auto text-xs bg-purple-900/50 text-purple-300 px-2 py-1 rounded-full truncate max-w-[140px]" x-text="'📋 ' + templateName"></span>
+      </div>
+
+      <!-- Step 1: Describe -->
+      <div x-show="step === 0" x-transition>
+        <h2 class="text-xl font-bold mb-4">{{ _('What do you want to create?') }}</h2>
+        <textarea x-model="form.prompt" rows="4" placeholder="{{ _('Describe the song you want... e.g. \'A sad song about leaving home, cinematic feel\'') }}"
+                  class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none resize-none"></textarea>
+
+        <div class="grid grid-cols-2 gap-4 mt-4">
+          <div>
+            <label class="text-sm text-gray-400 mb-1 block">{{ _('Song Language') }}</label>
+            <select x-model="form.language" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white">
+              <option value="auto">{{ _('Auto Detect') }}</option>
+              <option value="zh">{{ _('中文') }}</option>
+              <option value="en">{{ _('English') }}</option>
+              <option value="ja">{{ _('日本語') }}</option>
+              <option value="ko">{{ _('한국어') }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm text-gray-400 mb-1 block">{{ _('Genre') }}</label>
+            <select x-model="form.style" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white">
+              <option value="pop">{{ _('Pop') }}</option>
+              <option value="rock">{{ _('Rock') }}</option>
+              <option value="electronic">{{ _('Electronic') }}</option>
+              <option value="hiphop">{{ _('Hip Hop') }}</option>
+              <option value="r&b">{{ _('R&B') }}</option>
+              <option value="jazz">{{ _('Jazz') }}</option>
+              <option value="classical">{{ _('Classical') }}</option>
+              <option value="folk">{{ _('Folk') }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm text-gray-400 mb-1 block">{{ _('Mood') }}</label>
+            <select x-model="form.mood" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white">
+              <option value="">{{ _('Any') }}</option>
+              <option value="happy">{{ _('Happy') }}</option>
+              <option value="sad">{{ _('Sad') }}</option>
+              <option value="energetic">{{ _('Energetic') }}</option>
+              <option value="calm">{{ _('Calm') }}</option>
+              <option value="dark">{{ _('Dark') }}</option>
+              <option value="romantic">{{ _('Romantic') }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm text-gray-400 mb-1 block">{{ _('Vocal') }}</label>
+            <select x-model="form.vocal" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white">
+              <option value="auto">{{ _('Auto') }}</option>
+              <option value="male">{{ _('Male') }}</option>
+              <option value="female">{{ _('Female') }}</option>
+            </select>
+          </div>
+        </div>
+
+        <button @click="generateLyrics()" :disabled="!form.prompt.trim() || loading"
+                class="mt-6 w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2">
+          <span x-show="loading && loadingStep === 'lyrics'" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          <span x-text="loading && loadingStep === 'lyrics' ? 'Generating...' : 'Generate Lyrics'"></span>
+        </button>
+      </div>
+
+      <!-- Step 2: Lyrics -->
+      <div x-show="step === 1" x-transition>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold">{{ _('Lyrics') }}</h2>
+          <div class="flex items-center gap-2">
+            <!-- Version selector -->
+            <select x-model="lyricsVersion" @change="switchLyricsVersion()" class="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-sm text-gray-300">
+              <template x-for="v in lyricsVersions" :key="v.num">
+                <option :value="v.num" x-text="`Version ${v.num}`"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
+        <div x-show="form.title" class="mb-3">
+          <label class="text-sm text-gray-400">{{ _('Title') }}</label>
+          <input x-model="form.title" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white mt-1">
+        </div>
+
+        <textarea x-model="form.lyrics" rows="16"
+                  class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none resize-y font-mono text-sm leading-relaxed"></textarea>
+
+        <div class="flex gap-3 mt-4">
+          <button @click="regenerateLyrics()" :disabled="loading"
+                  class="flex-1 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium transition">
+            {{ _('Regenerate') }}
+          </button>
+          <button @click="step = 2" class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-2.5 rounded-xl font-medium transition">
+            {{ _('Continue') }} →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Music -->
+      <div x-show="step === 2" x-transition>
+        <h2 class="text-xl font-bold mb-4">{{ _('Music Settings') }}</h2>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm text-gray-400 mb-1 block">{{ _('Genre') }}</label>
+            <select x-model="form.style" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white">
+              <option value="pop">{{ _('Pop') }}</option>
+              <option value="rock">{{ _('Rock') }}</option>
+              <option value="electronic">{{ _('Electronic') }}</option>
+              <option value="hiphop">{{ _('Hip Hop') }}</option>
+              <option value="r&b">{{ _('R&B') }}</option>
+              <option value="folk">{{ _('Folk') }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm text-gray-400 mb-1 block">{{ _('Versions') }}</label>
+            <select x-model="form.numVersions" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white">
+              <option value="1">{{ _('1 Version') }}</option>
+              <option value="2">{{ _('2 Versions') }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Generate Music Button -->
+        <button @click="generateMusic()" :disabled="loading || musicGenerating"
+                class="mt-6 w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2">
+          <span x-show="musicGenerating" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          <span x-text="musicGenerating ? 'Generating Music...' : 'Generate Music'"></span>
+        </button>
+
+        <!-- Music Generation Progress -->
+        <div x-show="musicGenerating" class="mt-4 bg-gray-900 rounded-xl p-4 border border-gray-800">
+          <div class="space-y-2">
+            <div class="flex items-center gap-2">
+              <span :class="musicProgress >= 25 ? 'text-green-400' : 'text-gray-500'" x-text="musicProgress >= 25 ? '✓' : '⏳'"></span>
+              <span class="text-sm" :class="musicProgress >= 25 ? 'text-gray-300' : 'text-gray-500'">{{ _('Analyzing lyrics') }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span :class="musicProgress >= 50 ? 'text-green-400' : 'text-gray-500'" x-text="musicProgress >= 50 ? '✓' : '⏳'"></span>
+              <span class="text-sm" :class="musicProgress >= 50 ? 'text-gray-300' : 'text-gray-500'">{{ _('Creating composition') }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span :class="musicProgress >= 75 ? 'text-green-400' : 'text-gray-500'" x-text="musicProgress >= 75 ? '✓' : '⏳'"></span>
+              <span class="text-sm" :class="musicProgress >= 75 ? 'text-gray-300' : 'text-gray-500'">{{ _('Generating vocals') }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span :class="musicProgress >= 95 ? 'text-green-400' : 'text-gray-500'" x-text="musicProgress >= 95 ? '✓' : '⏳'"></span>
+              <span class="text-sm" :class="musicProgress >= 95 ? 'text-gray-300' : 'text-gray-500'">{{ _('Finalizing audio') }}</span>
+            </div>
+          </div>
+          <div class="mt-3 bg-gray-800 rounded-full h-2">
+            <div class="bg-purple-600 h-2 rounded-full transition-all duration-500" :style="`width: ${musicProgress}%`"></div>
+          </div>
+        </div>
+
+        <!-- Generated Tracks -->
+        <div x-show="musicVersions.length > 0 && !musicGenerating" class="mt-4 space-y-3">
+          <h3 class="text-sm font-semibold text-gray-400 uppercase">{{ _('Generated Versions') }}</h3>
+          <template x-for="(v, i) in musicVersions" :key="i">
+            <div class="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center gap-3"
+                 :class="selectedVersion === i ? 'border-purple-500' : ''">
+              <button @click="selectedVersion = i; playPreview(v.audio_url)" class="w-10 h-10 bg-purple-600/20 rounded-full flex items-center justify-center hover:bg-purple-600/40 transition">
+                <svg class="w-4 h-4 text-purple-400 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <div class="flex-1 min-w-0">
+                <p class="font-medium truncate" x-text="v.title || `Version ${i + 1}`"></p>
+                <p class="text-xs text-gray-500" x-text="formatDuration(v.duration_ms)"></p>
+              </div>
+              <span x-show="selectedVersion === i" class="text-purple-400 text-sm font-medium">{{ _('Selected') }}</span>
+            </div>
+          </template>
+          <button @click="step = 3" class="w-full mt-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 rounded-xl font-medium transition">
+            {{ _('Continue to Visuals') }} →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 4: Visuals -->
+      <div x-show="step === 3" x-transition>
+        <h2 class="text-xl font-bold mb-4">{{ _('Visuals') }}</h2>
+
+        <!-- Cover Generation -->
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-400 uppercase mb-3">{{ _('Cover Art') }}</h3>
+          <div class="grid grid-cols-3 gap-2 mb-3">
+            <template x-for="s in coverStyles" :key="s">
+              <button @click="form.coverStyle = s" :class="form.coverStyle === s ? 'border-purple-500 bg-purple-600/20' : 'border-gray-700 bg-gray-900'"
+                      class="border rounded-lg px-3 py-2 text-sm transition" x-text="s"></button>
+            </template>
+          </div>
+          <button @click="generateCover()" :disabled="loading || coverGenerating"
+                  class="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium transition flex items-center justify-center gap-2">
+            <span x-show="coverGenerating" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span x-text="coverGenerating ? 'Generating Cover...' : 'Generate Cover'"></span>
+          </button>
+          <div x-show="form.cover_url" class="mt-3 aspect-square max-w-[200px] rounded-xl overflow-hidden">
+            <img :src="form.cover_url" class="w-full h-full object-cover">
+          </div>
+        </div>
+
+        <!-- MV Generation -->
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-400 uppercase mb-3">{{ _('Music Video') }}</h3>
+          <div class="grid grid-cols-3 gap-2 mb-3">
+            <template x-for="s in videoStyles" :key="s">
+              <button @click="form.videoStyle = s" :class="form.videoStyle === s ? 'border-purple-500 bg-purple-600/20' : 'border-gray-700 bg-gray-900'"
+                      class="border rounded-lg px-3 py-2 text-sm transition" x-text="s"></button>
+            </template>
+          </div>
+          <button @click="generateMV()" :disabled="loading || mvGenerating"
+                  class="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium transition flex items-center justify-center gap-2">
+            <span x-show="mvGenerating" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span x-text="mvGenerating ? 'Generating MV...' : 'Generate Music Video'"></span>
+          </button>
+          <div x-show="mvProgress > 0 && mvProgress < 100" class="mt-2">
+            <div class="bg-gray-800 rounded-full h-2">
+              <div class="bg-pink-600 h-2 rounded-full transition-all" :style="`width: ${mvProgress}%`"></div>
+            </div>
+          </div>
+          <div x-show="form.video_url" class="mt-3 rounded-xl overflow-hidden aspect-video bg-gray-900">
+            <video :src="form.video_url" controls class="w-full h-full object-cover"></video>
+          </div>
+        </div>
+
+        <!-- Publish -->
+        <button @click="publishCreation()" :disabled="publishing"
+                class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2">
+          <span x-show="publishing" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          <span x-text="publishing ? 'Publishing...' : '✨ Publish Creation'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right Panel: Preview -->
+    <div class="flex-1 p-6 flex flex-col items-center justify-center overflow-y-auto">
+      <!-- Empty state -->
+      <div x-show="step === 0 && !form.prompt" class="text-center text-gray-600">
+        <svg class="w-24 h-24 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+        <p class="text-lg">{{ _('Describe your song to get started') }}</p>
+        <p class="text-sm mt-2">{{ _('The preview will appear here') }}</p>
+      </div>
+
+      <!-- Lyrics Preview -->
+      <div x-show="step === 1 && form.lyrics" class="w-full max-w-lg">
+        <div class="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+          <h3 class="text-lg font-bold mb-1" x-text="form.title || 'Untitled'"></h3>
+          <p class="text-sm text-gray-500 mb-4" x-text="`${form.style} · ${form.language}`"></p>
+          <pre class="text-gray-300 text-sm whitespace-pre-wrap font-sans leading-relaxed" x-text="form.lyrics"></pre>
+        </div>
+      </div>
+
+      <!-- Music Preview -->
+      <div x-show="step === 2 && musicVersions.length > 0" class="w-full max-w-lg">
+        <div class="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+          <div class="aspect-square bg-gray-800 rounded-xl mb-4 overflow-hidden flex items-center justify-center">
+            <img x-show="musicVersions[selectedVersion]?.cover_url" :src="musicVersions[selectedVersion]?.cover_url" class="w-full h-full object-cover">
+            <svg x-show="!musicVersions[selectedVersion]?.cover_url" class="w-20 h-20 text-gray-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          </div>
+          <h3 class="text-lg font-bold" x-text="musicVersions[selectedVersion]?.title || form.title || 'Untitled'"></h3>
+          <audio x-ref="previewAudio" class="w-full mt-3" controls :src="musicVersions[selectedVersion]?.audio_url"></audio>
+        </div>
+      </div>
+
+      <!-- Visuals Preview -->
+      <div x-show="step === 3" class="w-full max-w-lg">
+        <div class="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+          <div class="aspect-video bg-gray-800 rounded-xl mb-4 overflow-hidden flex items-center justify-center relative">
+            <video x-show="form.video_url" :src="form.video_url" controls class="w-full h-full object-cover"></video>
+            <img x-show="!form.video_url && form.cover_url" :src="form.cover_url" class="w-full h-full object-cover">
+            <div x-show="!form.video_url && !form.cover_url" class="text-gray-600 text-center">
+              <svg class="w-16 h-16 mx-auto" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+              <p class="text-sm mt-2">{{ _('Generate visuals to preview') }}</p>
+            </div>
+          </div>
+          <h3 class="text-lg font-bold" x-text="form.title || 'Untitled'"></h3>
+          <p class="text-sm text-gray-500 mt-1">{{ _('Ready to publish your creation') }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden audio for preview -->
+  <audio x-ref="hiddenAudio" class="hidden"></audio>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  function wizard() {
+    return {
+      step: 0,
+      steps: ['Describe', 'Lyrics', 'Music', 'Visuals'],
+      loading: false,
+      loadingStep: '',
+
+      // Form data
+      form: {
+        prompt: '',
+        language: 'auto',
+        style: 'pop',
+        mood: '',
+        vocal: 'auto',
+        title: '',
+        lyrics: '',
+        lrc: '',
+        numVersions: '2',
+        coverStyle: 'Cinematic',
+        videoStyle: 'Cinematic',
+        cover_url: '',
+        audio_url: '',
+        video_url: '',
+      },
+
+      // Lyrics versions
+      lyricsVersion: 1,
+      lyricsVersions: [],
+
+      // Music
+      musicVersions: [],
+      selectedVersion: 0,
+      musicGenerating: false,
+      musicProgress: 0,
+
+      // Visuals
+      coverStyles: ['Cinematic', 'Anime', 'Abstract'],
+      videoStyles: ['Cinematic', 'Anime', 'Fantasy'],
+      coverGenerating: false,
+      mvGenerating: false,
+      mvProgress: 0,
+
+      // Template prefill
+      templateName: '',
+      musicPrompt: '',
+
+      // Credits info
+      usageInfo: null,
+      showModal: false,
+      modalTitle: '',
+      modalMessage: '',
+
+      // Publish
+      publishing: false,
+
+      init() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('prompt')) {
+          this.form.prompt = params.get('prompt');
+        }
+        // Check for template prefill
+        try {
+          const td = JSON.parse(sessionStorage.getItem('template_data'));
+          if (td) {
+            if (td.prompt) this.form.prompt = td.prompt;
+            if (td.style) this.form.style = td.style;
+            if (td.title) this.form.title = td.title;
+            if (td.lyrics) this.form.lyrics = td.lyrics;
+            if (td.music_prompt && !this.form.prompt) this.form.prompt = td.music_prompt;
+            if (td.lyric_template) this.form.lyrics = td.lyric_template;
+            if (td.style_tags) this.form.style = td.style_tags.split(',')[0].trim().toLowerCase();
+            this.templateName = td.template_name || '';
+            sessionStorage.removeItem('template_data');
+          }
+        } catch (e) {}
+        this.loadUsage();
+      },
+
+      async loadUsage() {
+        try {
+          const res = await fetch('/api/v1/credits/balance');
+          const data = await res.json();
+          this.usageInfo = data.daily || data;
+        } catch (e) { console.error('Failed to load usage:', e); }
+      },
+
+      showModalMsg(title, message) {
+        this.modalTitle = title;
+        this.modalMessage = message;
+        this.showModal = true;
+      },
+
+      checkCreditsError(res) {
+        if (res.status === 429) {
+          return true;
+        }
+        return false;
+      },
+
+      goToStep(i) {
+        if (i <= this.step) this.step = i;
+      },
+
+      // ── Step 1: Generate Lyrics ──
+      async generateLyrics() {
+        if (!this.form.prompt.trim()) return;
+        if (this.loading) return;
+        this.loading = true;
+        this.loadingStep = 'lyrics';
+        const idemKey = crypto.randomUUID();
+        try {
+          const res = await fetch('/api/v1/ai/lyrics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idemKey },
+            body: JSON.stringify({
+              prompt: this.form.prompt,
+              style: this.form.style,
+              language: this.form.language === 'auto' ? 'zh' : this.form.language,
+            }),
+          });
+          if (this.checkCreditsError(res)) {
+            const data = await res.json();
+            this.showModalMsg('额度不足', data.detail || '今日免费额度已用尽，请明日再试。');
+            this.loading = false; this.loadingStep = ''; return;
+          }
+          const data = await res.json();
+          if (data.data) {
+            this.form.lyrics = data.data.lyrics || '';
+            this.form.lrc = data.data.lrc || '';
+            const titleMatch = this.form.lyrics.match(/Title:\s*(.+)/i);
+            if (titleMatch) this.form.title = titleMatch[1].trim();
+            this.lyricsVersions.push({ num: this.lyricsVersions.length + 1, lyrics: this.form.lyrics });
+            this.step = 1;
+          }
+        } catch (e) {
+          console.error('Lyrics generation failed:', e);
+          this.showModalMsg('生成失败', '歌词生成失败，请稍后重试。');
+        }
+        this.loading = false;
+        this.loadingStep = '';
+        this.loadUsage();
+      },
+
+      async regenerateLyrics() {
+        this.lyricsVersion++;
+        await this.generateLyrics();
+      },
+
+      switchLyricsVersion() {
+        const v = this.lyricsVersions.find(v => v.num === this.lyricsVersion);
+        if (v) this.form.lyrics = v.lyrics;
+      },
+
+      // ── Step 2: Generate Music ──
+      async generateMusic() {
+        if (this.loading || this.musicGenerating) return;
+        this.musicGenerating = true;
+        this.musicProgress = 0;
+        this.musicVersions = [];
+        const idemKey = crypto.randomUUID();
+
+        try {
+          const res = await fetch('/api/v1/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idemKey },
+            body: JSON.stringify({
+              prompt: this.form.prompt,
+              style: this.form.style,
+              title: this.form.title || undefined,
+              lyrics: this.form.lyrics || undefined,
+              instrumental: false,
+            }),
+          });
+          const data = await res.json();
+          const jobId = data.job_id;
+
+          // Poll for status
+          const poll = setInterval(async () => {
+            try {
+              const statusRes = await fetch(`/api/v1/ai/job/${jobId}`);
+              const status = await statusRes.json();
+              this.musicProgress = status.progress || 0;
+
+              if (status.status === 'completed') {
+                clearInterval(poll);
+                this.musicGenerating = false;
+                this.musicProgress = 100;
+                // Parse result
+                if (status.result?.tracks) {
+                  this.musicVersions = status.result.tracks;
+                  if (this.musicVersions.length > 0) {
+                    this.form.audio_url = this.musicVersions[0].audio_url;
+                    this.form.title = this.form.title || this.musicVersions[0].title;
+                  }
+                }
+              } else if (status.status === 'failed') {
+                clearInterval(poll);
+                this.musicGenerating = false;
+                alert('Music generation failed: ' + (status.error || 'Unknown error'));
+              }
+            } catch (e) {
+              clearInterval(poll);
+              this.musicGenerating = false;
+              this.loadUsage();
+            }
+          }, 2000);
+        } catch (e) {
+          this.musicGenerating = false;
+          console.error('Music generation failed:', e);
+          alert('Music generation failed. Please try again.');
+        }
+      },
+
+      playPreview(url) {
+        if (!url) return;
+        const audio = this.$refs.hiddenAudio;
+        audio.src = url;
+        audio.play();
+      },
+
+      // ── Step 3: Generate Visuals ──
+      async generateCover() {
+        this.coverGenerating = true;
+        try {
+          if (this.musicVersions[this.selectedVersion]?.cover_url) {
+            this.form.cover_url = this.musicVersions[this.selectedVersion].cover_url;
+          } else {
+            this.form.cover_url = '';
+            alert('Cover generation requires additional API configuration.');
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        this.coverGenerating = false;
+      },
+
+      async generateMV() {
+        if (this.loading || this.mvGenerating) return;
+        this.mvGenerating = true;
+        this.mvProgress = 0;
+        const idemKey = crypto.randomUUID();
+        try {
+          const res = await fetch('/api/v1/ai/mv/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idemKey },
+            body: JSON.stringify({
+              audio_url: this.form.audio_url || '',
+              prompt: this.form.prompt,
+              style: this.form.videoStyle,
+            }),
+          });
+          const data = await res.json();
+          const jobId = data.job_id;
+
+          const poll = setInterval(async () => {
+            try {
+              const statusRes = await fetch(`/api/v1/ai/job/${jobId}`);
+              const status = await statusRes.json();
+              this.mvProgress = status.progress || 0;
+
+              if (status.status === 'completed') {
+                clearInterval(poll);
+                this.mvGenerating = false;
+                this.mvProgress = 100;
+                if (status.result?.video_url) {
+                  this.form.video_url = status.result.video_url;
+                }
+              } else if (status.status === 'failed') {
+                clearInterval(poll);
+                this.mvGenerating = false;
+              }
+            } catch (e) {
+              clearInterval(poll);
+              this.mvGenerating = false;
+              this.loadUsage();
+            }
+          }, 3000);
+        } catch (e) {
+          this.mvGenerating = false;
+          console.error('MV generation failed:', e);
+        }
+      },
+
+      // ── Step 4: Publish ──
+      async publishCreation() {
+        this.publishing = true;
+        try {
+          const res = await fetch('/api/v1/ai/one-click-create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: this.form.prompt,
+              style: this.form.style,
+              language: this.form.language === 'auto' ? 'zh' : this.form.language,
+              generate_mv: !!this.form.video_url,
+            }),
+          });
+          const data = await res.json();
+
+          const saveRes = await fetch('/api/v1/creations/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt_text: this.form.prompt,
+              title: this.form.title || 'Untitled',
+              style_tags: this.form.style,
+              language: this.form.language === 'auto' ? 'zh' : this.form.language,
+              lyrics: this.form.lyrics,
+              lrc: this.form.lrc,
+              audio_url: this.form.audio_url,
+              cover_url: this.form.cover_url,
+              video_url: this.form.video_url,
+              duration_ms: this.musicVersions[this.selectedVersion]?.duration_ms || null,
+            }),
+          });
+          const saved = await saveRes.json();
+          if (saved.id) {
+            window.location.href = `/creation/${saved.id}`;
+          }
+        } catch (e) {
+          console.error('Publish failed:', e);
+          alert('Publish failed. Please try again.');
+        }
+        this.publishing = false;
+      },
+
+      formatDuration(ms) {
+        if (!ms) return '--:--';
+        const s = Math.floor(ms / 1000);
+        const m = Math.floor(s / 60);
+        return `${m}:${String(s % 60).padStart(2, '0')}`;
+      },
+    };
+  }
+</script>
+{% endblock %}

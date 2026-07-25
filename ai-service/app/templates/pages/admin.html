@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+{% block head %}<title>{{ _('Admin — Avireon') }}</title>{% endblock %}
+{% block content %}
+<main class="flex-1 max-w-7xl mx-auto w-full px-6 py-8" x-data="admin()" x-init="init()">
+  <h1 class="text-3xl font-bold mb-8">{{ _('Admin Dashboard') }}</h1>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
+      <p class="text-sm text-gray-400">{{ _('Total Users') }}</p>
+      <p class="text-3xl font-bold text-white mt-1" x-text="stats.users?.total || 0"></p>
+      <p class="text-xs text-green-400 mt-1">+<span x-text="stats.users?.today || 0"></span> {{ _('today') }}</p>
+    </div>
+    <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
+      <p class="text-sm text-gray-400">{{ _('Songs Generated') }}</p>
+      <p class="text-3xl font-bold text-white mt-1" x-text="stats.creations?.total || 0"></p>
+      <p class="text-xs text-green-400 mt-1">+<span x-text="stats.creations?.today || 0"></span> {{ _('today') }}</p>
+    </div>
+    <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
+      <p class="text-sm text-gray-400">{{ _('MV Generated') }}</p>
+      <p class="text-3xl font-bold text-white mt-1" x-text="stats.creations?.with_mv || 0"></p>
+    </div>
+    <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
+      <p class="text-sm text-gray-400">{{ _('Failed Jobs') }}</p>
+      <p class="text-3xl font-bold text-red-400 mt-1" x-text="stats.jobs?.failed || 0"></p>
+      <p class="text-xs text-gray-500 mt-1"><span x-text="stats.jobs?.processing || 0"></span> {{ _('processing') }}</p>
+    </div>
+  </div>
+
+  <div class="flex gap-1 mb-6 bg-gray-900 rounded-xl p-1 w-fit">
+    <button @click="tab = 'users'" :class="tab === 'users' ? 'bg-purple-600 text-white' : 'text-gray-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">{{ _('Users') }}</button>
+    <button @click="tab = 'jobs'" :class="tab === 'jobs' ? 'bg-purple-600 text-white' : 'text-gray-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">{{ _('Jobs') }}</button>
+    <button @click="tab = 'templates'" :class="tab === 'templates' ? 'bg-purple-600 text-white' : 'text-gray-400'" class="px-4 py-2 rounded-lg text-sm font-medium transition">{{ _('Templates') }}</button>
+  </div>
+
+  <!-- Users Tab -->
+  <div x-show="tab === 'users'">
+    <div class="flex items-center gap-4 mb-4">
+      <input x-model="userSearch" @input.debounce.400ms="loadUsers()" type="text" placeholder="{{ _('Search users...') }}"
+             class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500">
+    </div>
+    <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-800">
+          <tr>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('User') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Email') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Credits') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Created') }}</th>
+            <th class="text-right px-4 py-3 text-gray-400 font-medium">{{ _('Actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="u in users" :key="u.id">
+            <tr class="border-t border-gray-800">
+              <td class="px-4 py-3" x-text="u.display_name || '-'"></td>
+              <td class="px-4 py-3 text-gray-400" x-text="u.email"></td>
+              <td class="px-4 py-3">
+                <span class="text-purple-400 font-medium" x-text="u.credits_balance"></span>
+              </td>
+              <td class="px-4 py-3 text-gray-500" x-text="u.created_at?.split('T')[0] || '-'"></td>
+              <td class="px-4 py-3 text-right">
+                <button @click="addCredits(u.id)" class="text-green-400 hover:text-green-300 text-xs mr-2">{{ _('+Credits') }}</button>
+                <button @click="removeCredits(u.id)" class="text-yellow-400 hover:text-yellow-300 text-xs mr-2">{{ _('-Credits') }}</button>
+                <button @click="deleteUser(u.id)" class="text-red-400 hover:text-red-300 text-xs">{{ _('Delete') }}</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Jobs Tab -->
+  <div x-show="tab === 'jobs'">
+    <div class="flex items-center gap-4 mb-4">
+      <select x-model="jobFilter" @change="loadJobs()" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
+        <option value="">{{ _('All Status') }}</option>
+        <option value="pending">{{ _('Pending') }}</option>
+        <option value="processing">{{ _('Processing') }}</option>
+        <option value="completed">{{ _('Completed') }}</option>
+        <option value="failed">{{ _('Failed') }}</option>
+      </select>
+    </div>
+    <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-800">
+          <tr>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Job ID') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Type') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Status') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Progress') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Created') }}</th>
+            <th class="text-right px-4 py-3 text-gray-400 font-medium">{{ _('Actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="j in jobs" :key="j.id">
+            <tr class="border-t border-gray-800">
+              <td class="px-4 py-3 font-mono text-xs" x-text="j.id?.substring(0, 8) || j.id"></td>
+              <td class="px-4 py-3" x-text="j.type"></td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-0.5 rounded-full text-xs"
+                      :class="{
+                        'bg-green-600/20 text-green-400': j.status === 'completed',
+                        'bg-yellow-600/20 text-yellow-400': j.status === 'processing' || j.status === 'pending',
+                        'bg-red-600/20 text-red-400': j.status === 'failed',
+                      }"
+                      x-text="j.status"></span>
+              </td>
+              <td class="px-4 py-3 text-gray-400" x-text="j.progress_pct + '%'"></td>
+              <td class="px-4 py-3 text-gray-500" x-text="j.created_at?.split('T')[0] || '-'"></td>
+              <td class="px-4 py-3 text-right">
+                <button x-show="j.status === 'failed'" @click="retryJob(j.id)" class="text-purple-400 hover:text-purple-300 text-xs">{{ _('Retry') }}</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Templates Tab -->
+  <div x-show="tab === 'templates'">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <label class="text-sm text-gray-400">{{ _('Show inactive only') }}</label>
+        <input type="checkbox" x-model="showInactive" @change="loadTemplates()" class="accent-purple-600">
+      </div>
+      <button @click="openCreateModal()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+        + {{ _('New Template') }}
+      </button>
+    </div>
+    <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-800">
+          <tr>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">ID</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Name') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Style Tags') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Cover') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Status') }}</th>
+            <th class="text-left px-4 py-3 text-gray-400 font-medium">{{ _('Created') }}</th>
+            <th class="text-right px-4 py-3 text-gray-400 font-medium">{{ _('Actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="t in templates" :key="t.id">
+            <tr class="border-t border-gray-800">
+              <td class="px-4 py-3 text-gray-500" x-text="t.id"></td>
+              <td class="px-4 py-3 font-medium" x-text="t.template_name"></td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap gap-1">
+                  <template x-for="tag in (t.style_tags || '').split(',')" :key="tag">
+                    <span class="text-xs bg-purple-900/50 text-purple-300 px-1.5 py-0.5 rounded" x-text="tag.trim()"></span>
+                  </template>
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <img x-show="t.cover_img" :src="t.cover_img" class="w-10 h-10 rounded object-cover bg-gray-800">
+                <span x-show="!t.cover_img" class="text-gray-600 text-xs italic">{{ _('none') }}</span>
+              </td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-0.5 rounded-full text-xs"
+                      :class="t.is_active ? 'bg-green-600/20 text-green-400' : 'bg-yellow-600/20 text-yellow-400'"
+                      x-text="t.is_active ? '{{ _('Active') }}' : '{{ _('Inactive') }}'"></span>
+              </td>
+              <td class="px-4 py-3 text-gray-500" x-text="t.created_at?.split('T')[0] || '-'"></td>
+              <td class="px-4 py-3 text-right whitespace-nowrap">
+                <button @click="openEditModal(t)" class="text-blue-400 hover:text-blue-300 text-xs mr-2">{{ _('Edit') }}</button>
+                <button x-show="!t.is_active" @click="auditTemplate(t.id, 'pass')" class="text-green-400 hover:text-green-300 text-xs mr-2">{{ _('Approve') }}</button>
+                <button x-show="t.is_active" @click="auditTemplate(t.id, 'reject')" class="text-yellow-400 hover:text-yellow-300 text-xs mr-2">{{ _('Reject') }}</button>
+                <button @click="deleteTemplate(t.id)" class="text-red-400 hover:text-red-300 text-xs">{{ _('Delete') }}</button>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="templates.length === 0">
+            <td colspan="7" class="text-center py-8 text-gray-500">{{ _('No templates found') }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Create/Edit Template Modal -->
+  <div x-show="showTemplateModal" x-cloak @click.self="closeTemplateModal()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-900 rounded-2xl border border-gray-800 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold" x-text="editingTemplate ? '{{ _('Edit Template') }}' : '{{ _('New Template') }}'"></h2>
+        <button @click="closeTemplateModal()" class="text-gray-500 hover:text-white text-xl">&times;</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">{{ _('Template Name') }} *</label>
+          <input x-model="templateForm.template_name" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">{{ _('Style Tags') }}</label>
+          <input x-model="templateForm.style_tags" placeholder="{{ _('e.g. 古风,国风,民乐') }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">{{ _('Cover Image URL') }}</label>
+          <input x-model="templateForm.cover_img" placeholder="https://..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500">
+          <img x-show="templateForm.cover_img" :src="templateForm.cover_img" class="mt-2 w-20 h-20 rounded object-cover bg-gray-800">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">{{ _('Lyric Template') }}</label>
+          <textarea x-model="templateForm.lyric_template" rows="6" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono text-sm"></textarea>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">{{ _('Music Prompt') }}</label>
+          <textarea x-model="templateForm.music_prompt" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"></textarea>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">{{ _('MV Scene Prompt') }}</label>
+          <textarea x-model="templateForm.mv_prompt" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"></textarea>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button @click="closeTemplateModal()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2.5 rounded-xl font-medium transition">
+          {{ _('Cancel') }}
+        </button>
+        <button @click="saveTemplate()" :disabled="!templateForm.template_name.trim() || saving"
+                class="flex-1 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium transition flex items-center justify-center gap-2">
+          <span x-show="saving" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          <span x-text="saving ? '{{ _('Saving...') }}' : '{{ _('Save') }}'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+  function admin() {
+    return {
+      tab: 'users',
+      stats: {},
+      users: [],
+      jobs: [],
+      templates: [],
+      userSearch: '',
+      jobFilter: '',
+      showInactive: false,
+
+      // Template modal
+      showTemplateModal: false,
+      editingTemplate: null,
+      saving: false,
+      templateForm: {
+        template_name: '',
+        cover_img: '',
+        style_tags: '',
+        lyric_template: '',
+        music_prompt: '',
+        mv_prompt: '',
+      },
+
+      async init() {
+        await Promise.all([this.loadStats(), this.loadUsers(), this.loadJobs(), this.loadTemplates()]);
+      },
+
+      async loadStats() {
+        try {
+          const res = await fetch('/api/v1/admin/dashboard');
+          this.stats = await res.json();
+        } catch (e) { console.error(e); }
+      },
+
+      async loadUsers() {
+        try {
+          const params = new URLSearchParams({ limit: '50' });
+          if (this.userSearch) params.set('q', this.userSearch);
+          const res = await fetch(`/api/v1/admin/users?${params}`);
+          const data = await res.json();
+          this.users = data.items || [];
+        } catch (e) { console.error(e); }
+      },
+
+      async loadJobs() {
+        try {
+          const params = new URLSearchParams({ limit: '50' });
+          if (this.jobFilter) params.set('status', this.jobFilter);
+          const res = await fetch(`/api/v1/admin/jobs?${params}`);
+          const data = await res.json();
+          this.jobs = data.items || [];
+        } catch (e) { console.error(e); }
+      },
+
+      async loadTemplates() {
+        try {
+          const params = new URLSearchParams({ limit: '100' });
+          if (this.showInactive) params.set('show_inactive', 'true');
+          const res = await fetch('/api/v1/admin/templates?' + params);
+          const data = await res.json();
+          this.templates = data.items || [];
+        } catch (e) { console.error(e); }
+      },
+
+      async addCredits(userId) {
+        const amount = parseInt(prompt('{{ _('How many credits to add?') }}'));
+        if (!amount || amount <= 0) return;
+        await fetch(`/api/v1/admin/users/${userId}/credits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add', amount }),
+        });
+        this.loadUsers();
+      },
+
+      async removeCredits(userId) {
+        const amount = parseInt(prompt('{{ _('How many credits to remove?') }}'));
+        if (!amount || amount <= 0) return;
+        await fetch(`/api/v1/admin/users/${userId}/credits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'remove', amount }),
+        });
+        this.loadUsers();
+      },
+
+      async deleteUser(userId) {
+        if (!confirm('{{ _('Delete this user? This cannot be undone.') }}')) return;
+        await fetch(`/api/v1/admin/users/${userId}`, { method: 'DELETE' });
+        this.loadUsers();
+      },
+
+      async retryJob(jobId) {
+        await fetch(`/api/v1/admin/jobs/${jobId}/retry`, { method: 'POST' });
+        this.loadJobs();
+      },
+
+      // ── Template CRUD ──
+      openCreateModal() {
+        this.editingTemplate = null;
+        this.templateForm = { template_name: '', cover_img: '', style_tags: '', lyric_template: '', music_prompt: '', mv_prompt: '' };
+        this.showTemplateModal = true;
+      },
+
+      openEditModal(t) {
+        this.editingTemplate = t;
+        this.templateForm = {
+          template_name: t.template_name || '',
+          cover_img: t.cover_img || '',
+          style_tags: t.style_tags || '',
+          lyric_template: t.lyric_template || '',
+          music_prompt: t.music_prompt || '',
+          mv_prompt: t.mv_prompt || '',
+        };
+        this.showTemplateModal = true;
+      },
+
+      closeTemplateModal() {
+        this.showTemplateModal = false;
+        this.editingTemplate = null;
+      },
+
+      async saveTemplate() {
+        if (!this.templateForm.template_name.trim() || this.saving) return;
+        this.saving = true;
+        try {
+          const body = JSON.stringify({
+            template_name: this.templateForm.template_name,
+            cover_img: this.templateForm.cover_img,
+            style_tags: this.templateForm.style_tags,
+            lyric_template: this.templateForm.lyric_template,
+            music_prompt: this.templateForm.music_prompt,
+            mv_prompt: this.templateForm.mv_prompt,
+          });
+          let url = '/api/v1/admin/templates';
+          let method = 'POST';
+          if (this.editingTemplate) {
+            url += '/' + this.editingTemplate.id;
+            method = 'PUT';
+          }
+          await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body });
+          this.closeTemplateModal();
+          this.loadTemplates();
+        } catch (e) { console.error(e); }
+        this.saving = false;
+      },
+
+      async deleteTemplate(id) {
+        if (!confirm('{{ _('Delete this template?') }}')) return;
+        await fetch(`/api/v1/admin/templates/${id}`, { method: 'DELETE' });
+        this.loadTemplates();
+      },
+
+      async auditTemplate(id, status) {
+        const form = new FormData();
+        form.append('audit_status', status);
+        await fetch(`/api/v1/admin/templates/${id}/audit`, { method: 'PUT', body: form });
+        this.loadTemplates();
+      },
+    };
+  }
+</script>
+{% endblock %}

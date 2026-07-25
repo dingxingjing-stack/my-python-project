@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block head %}
+<meta property="og:title" content="{{ creation.title or _('Untitled') }} — {{ _('Avireon') }}">
+<meta property="og:description" content="{{ creation.prompt_text or _('AI generated music') }}">
+<meta property="og:image" content="{{ creation.cover_url or '' }}">
+<meta property="og:type" content="music.song">
+<meta name="description" content="{{ creation.prompt_text or _('Listen to this AI generated song on Avireon') }}">
+<title>{{ creation.title or _('Untitled') }} — {{ _('shared on Avireon') }}</title>
+{% endblock %}
+{% block content %}
+<nav class="bg-gray-900/80 backdrop-blur-md border-b border-gray-800 px-6 py-3">
+  <div class="max-w-4xl mx-auto flex items-center justify-between">
+    <a href="/" class="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">{{ _('Avireon') }}</a>
+    <a href="/create" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition">{{ _('Create your own') }}</a>
+  </div>
+</nav>
+
+<main class="flex-1 max-w-4xl mx-auto w-full px-6 py-12" x-data="sharePage()">
+  <div x-show="showBonus" x-cloak x-transition
+       class="mb-8 bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-2xl p-4 text-center">
+    <p class="text-purple-300 text-sm font-medium">{{ _('🎉 You unlocked a bonus generation for the creator!') }}</p>
+  </div>
+
+  <div class="flex flex-col md:flex-row gap-10 items-center md:items-start">
+    <div class="w-72 flex-shrink-0">
+      <div class="aspect-square bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 shadow-xl">
+        {% if creation.cover_url %}
+        <img src="{{ creation.cover_url }}" alt="{{ creation.title }}" class="w-full h-full object-cover">
+        {% else %}
+        <div class="w-full h-full flex items-center justify-center">
+          <svg class="w-24 h-24 text-gray-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="flex-1 text-center md:text-left">
+      <h1 class="text-3xl md:text-4xl font-bold mb-2">{{ creation.title or _('Untitled') }}</h1>
+      <p class="text-gray-400 mb-1">{{ creation.style_tags or '' }}{% if creation.language %} · {{ creation.language }}{% endif %}</p>
+      <p class="text-sm text-gray-500 mb-1">by {{ creation.creator_name or _('Anonymous') }}</p>
+      <p class="text-gray-400 text-sm mb-6">{{ (creation.prompt_text or '')[:200] }}</p>
+
+      <div class="flex items-center justify-center md:justify-start gap-4 text-sm text-gray-500 mb-8">
+        <span>{{ creation.plays_count or 0 }} {{ _('plays') }}</span>
+        <span x-text="clickCount">0</span><span>{{ _('clicks') }}</span>
+      </div>
+
+      <div class="flex flex-wrap gap-3 justify-center md:justify-start">
+        <button @click="togglePlay()"
+                class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-8 py-3.5 rounded-xl font-semibold transition flex items-center gap-2 shadow-lg shadow-purple-600/20">
+          <svg x-show="!playing" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg x-show="playing" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          <span x-text="playing ? '{{ _('Pause') }}' : '{{ _('Listen') }}'"></span>
+        </button>
+        <button @click="remix()" :disabled="remixing"
+                class="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white px-6 py-3.5 rounded-xl font-medium transition flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span x-text="remixing ? '{{ _('Remixing...') }}' : '{{ _('Remix this') }}'"></span>
+        </button>
+      </div>
+
+      <audio x-ref="audioPlayer" src="{{ creation.audio_url or '' }}" @ended="playing = false" preload="none"></audio>
+    </div>
+  </div>
+
+  {% if creation.lyrics %}
+  <div class="mt-12 max-w-2xl mx-auto">
+    <h2 class="text-lg font-semibold mb-4 text-gray-300">{{ _('Lyrics') }}</h2>
+    <div class="bg-gray-900/50 rounded-xl border border-gray-800 p-6 max-h-80 overflow-y-auto">
+      <pre class="text-gray-400 text-sm leading-relaxed font-sans whitespace-pre-wrap">{{ creation.lyrics[:1500] }}</pre>
+    </div>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+  const creation = {{ creation | tojson }};
+  const shareCode = '{{ share_code }}';
+
+  function sharePage() {
+    return {
+      playing: false,
+      remixing: false,
+      showBonus: {{ 'true' if was_zero is defined and was_zero else 'false' }},
+      clickCount: 0,
+
+      init() {
+        this.loadClickCount();
+      },
+
+      async loadClickCount() {
+        try {
+          const res = await fetch(`/api/v1/works/${creation.id}`);
+          const data = await res.json();
+          if (data.data) this.clickCount = data.data.plays_count || 0;
+        } catch (e) {}
+      },
+
+      togglePlay() {
+        const audio = this.$refs.audioPlayer;
+        if (!audio || !audio.src) return;
+        if (this.playing) {
+          audio.pause();
+        } else {
+          audio.play().catch(() => {});
+        }
+        this.playing = !this.playing;
+      },
+
+      async remix() {
+        this.remixing = true;
+        try {
+          const res = await fetch(`/api/v1/creations/${creation.id}/duplicate`, { method: 'POST' });
+          const data = await res.json();
+          if (data.success) window.location.href = `/creation/${data.data.id}`;
+        } catch (e) { console.error('Remix failed:', e); }
+        this.remixing = false;
+      },
+    };
+  }
+</script>
+{% endblock %}

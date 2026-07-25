@@ -1,0 +1,879 @@
+# Translations template for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-07-25 16:51-0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: app/templates/base.html:7
+msgid "AI music creation platform"
+msgstr ""
+
+#: app/templates/base.html:19 app/templates/base.html:46
+#: app/templates/pages/home.html:43
+msgid "Create"
+msgstr ""
+
+#: app/templates/base.html:20 app/templates/base.html:47
+#: app/templates/base.html:63 app/templates/pages/explore.html:4
+msgid "Explore"
+msgstr ""
+
+#: app/templates/base.html:21 app/templates/base.html:48
+msgid "Library"
+msgstr ""
+
+#: app/templates/base.html:22 app/templates/base.html:49
+#: app/templates/base.html:64
+msgid "Templates"
+msgstr ""
+
+#: app/templates/base.html:41
+msgid "Sign In"
+msgstr ""
+
+#: app/templates/base.html:42
+msgid "Sign Up"
+msgstr ""
+
+#: app/templates/base.html:65 app/templates/pages/settings.html:2
+#: app/templates/pages/settings.html:11
+msgid "Settings"
+msgstr ""
+
+#: app/templates/pages/admin.html:2
+msgid "Admin — Avireon"
+msgstr ""
+
+#: app/templates/pages/admin.html:5
+msgid "Admin Dashboard"
+msgstr ""
+
+#: app/templates/pages/admin.html:9
+msgid "Total Users"
+msgstr ""
+
+#: app/templates/pages/admin.html:11 app/templates/pages/admin.html:16
+msgid "today"
+msgstr ""
+
+#: app/templates/pages/admin.html:14
+msgid "Songs Generated"
+msgstr ""
+
+#: app/templates/pages/admin.html:19
+msgid "MV Generated"
+msgstr ""
+
+#: app/templates/pages/admin.html:23
+msgid "Failed Jobs"
+msgstr ""
+
+#: app/templates/pages/admin.html:25
+msgid "processing"
+msgstr ""
+
+#: app/templates/pages/admin.html:30
+msgid "Users"
+msgstr ""
+
+#: app/templates/pages/admin.html:31
+msgid "Jobs"
+msgstr ""
+
+#: app/templates/pages/admin.html:36
+msgid "Search users..."
+msgstr ""
+
+#: app/templates/pages/admin.html:43
+msgid "User"
+msgstr ""
+
+#: app/templates/pages/admin.html:44 app/templates/pages/settings.html:18
+msgid "Email"
+msgstr ""
+
+#: app/templates/pages/admin.html:45
+msgid "Credits"
+msgstr ""
+
+#: app/templates/pages/admin.html:46 app/templates/pages/admin.html:89
+msgid "Created"
+msgstr ""
+
+#: app/templates/pages/admin.html:47 app/templates/pages/admin.html:90
+msgid "Actions"
+msgstr ""
+
+#: app/templates/pages/admin.html:60
+msgid "+Credits"
+msgstr ""
+
+#: app/templates/pages/admin.html:61
+msgid "-Credits"
+msgstr ""
+
+#: app/templates/pages/admin.html:62 app/templates/pages/library.html:68
+msgid "Delete"
+msgstr ""
+
+#: app/templates/pages/admin.html:74
+msgid "All Status"
+msgstr ""
+
+#: app/templates/pages/admin.html:75
+msgid "Pending"
+msgstr ""
+
+#: app/templates/pages/admin.html:76
+msgid "Processing"
+msgstr ""
+
+#: app/templates/pages/admin.html:77
+msgid "Completed"
+msgstr ""
+
+#: app/templates/pages/admin.html:78
+msgid "Failed"
+msgstr ""
+
+#: app/templates/pages/admin.html:85
+msgid "Job ID"
+msgstr ""
+
+#: app/templates/pages/admin.html:86
+msgid "Type"
+msgstr ""
+
+#: app/templates/pages/admin.html:87
+msgid "Status"
+msgstr ""
+
+#: app/templates/pages/admin.html:88
+msgid "Progress"
+msgstr ""
+
+#: app/templates/pages/admin.html:110
+msgid "Retry"
+msgstr ""
+
+#: app/templates/pages/admin.html:163
+msgid "How many credits to add?"
+msgstr ""
+
+#: app/templates/pages/admin.html:174
+msgid "How many credits to remove?"
+msgstr ""
+
+#: app/templates/pages/admin.html:185
+msgid "Delete this user? This cannot be undone."
+msgstr ""
+
+#: app/templates/pages/create.html:2
+msgid "Create — Avireon"
+msgstr ""
+
+#: app/templates/pages/create.html:10
+msgid "今日生成:"
+msgstr ""
+
+#: app/templates/pages/create.html:14
+msgid "MV:"
+msgstr ""
+
+#: app/templates/pages/create.html:18
+msgid "全局:"
+msgstr ""
+
+#: app/templates/pages/create.html:29
+msgid "知道了"
+msgstr ""
+
+#: app/templates/pages/create.html:52
+msgid "What do you want to create?"
+msgstr ""
+
+#: app/templates/pages/create.html:53
+msgid ""
+"Describe the song you want... e.g. 'A sad song about leaving home, "
+"cinematic feel'"
+msgstr ""
+
+#: app/templates/pages/create.html:58
+msgid "Song Language"
+msgstr ""
+
+#: app/templates/pages/create.html:60 app/templates/pages/settings.html:53
+msgid "Auto Detect"
+msgstr ""
+
+#: app/templates/pages/create.html:61 app/templates/pages/settings.html:54
+msgid "中文"
+msgstr ""
+
+#: app/templates/pages/create.html:62 app/templates/pages/settings.html:40
+#: app/templates/pages/settings.html:55
+msgid "English"
+msgstr ""
+
+#: app/templates/pages/create.html:63 app/templates/pages/settings.html:56
+msgid "日本語"
+msgstr ""
+
+#: app/templates/pages/create.html:64 app/templates/pages/settings.html:57
+msgid "한국어"
+msgstr ""
+
+#: app/templates/pages/create.html:68 app/templates/pages/create.html:148
+msgid "Genre"
+msgstr ""
+
+#: app/templates/pages/create.html:70 app/templates/pages/create.html:150
+#: app/templates/pages/settings.html:63
+msgid "Pop"
+msgstr ""
+
+#: app/templates/pages/create.html:71 app/templates/pages/create.html:151
+#: app/templates/pages/settings.html:64
+msgid "Rock"
+msgstr ""
+
+#: app/templates/pages/create.html:72 app/templates/pages/create.html:152
+#: app/templates/pages/settings.html:65
+msgid "Electronic"
+msgstr ""
+
+#: app/templates/pages/create.html:73 app/templates/pages/create.html:153
+#: app/templates/pages/settings.html:66
+msgid "Hip Hop"
+msgstr ""
+
+#: app/templates/pages/create.html:74 app/templates/pages/create.html:154
+#: app/templates/pages/settings.html:67
+msgid "R&B"
+msgstr ""
+
+#: app/templates/pages/create.html:75
+msgid "Jazz"
+msgstr ""
+
+#: app/templates/pages/create.html:76
+msgid "Classical"
+msgstr ""
+
+#: app/templates/pages/create.html:77 app/templates/pages/create.html:155
+#: app/templates/pages/settings.html:68
+msgid "Folk"
+msgstr ""
+
+#: app/templates/pages/create.html:81
+msgid "Mood"
+msgstr ""
+
+#: app/templates/pages/create.html:83
+msgid "Any"
+msgstr ""
+
+#: app/templates/pages/create.html:84
+msgid "Happy"
+msgstr ""
+
+#: app/templates/pages/create.html:85
+msgid "Sad"
+msgstr ""
+
+#: app/templates/pages/create.html:86
+msgid "Energetic"
+msgstr ""
+
+#: app/templates/pages/create.html:87
+msgid "Calm"
+msgstr ""
+
+#: app/templates/pages/create.html:88
+msgid "Dark"
+msgstr ""
+
+#: app/templates/pages/create.html:89
+msgid "Romantic"
+msgstr ""
+
+#: app/templates/pages/create.html:93
+msgid "Vocal"
+msgstr ""
+
+#: app/templates/pages/create.html:95 app/templates/pages/settings.html:74
+msgid "Auto"
+msgstr ""
+
+#: app/templates/pages/create.html:96 app/templates/pages/settings.html:75
+msgid "Male"
+msgstr ""
+
+#: app/templates/pages/create.html:97 app/templates/pages/settings.html:76
+msgid "Female"
+msgstr ""
+
+#: app/templates/pages/create.html:112 app/templates/pages/creation.html:100
+#: app/templates/pages/home.html:114 app/templates/pages/share-event.html:68
+msgid "Lyrics"
+msgstr ""
+
+#: app/templates/pages/create.html:124
+msgid "Title"
+msgstr ""
+
+#: app/templates/pages/create.html:134
+msgid "Regenerate"
+msgstr ""
+
+#: app/templates/pages/create.html:137
+msgid "Continue"
+msgstr ""
+
+#: app/templates/pages/create.html:144
+msgid "Music Settings"
+msgstr ""
+
+#: app/templates/pages/create.html:159
+msgid "Versions"
+msgstr ""
+
+#: app/templates/pages/create.html:161
+msgid "1 Version"
+msgstr ""
+
+#: app/templates/pages/create.html:162
+msgid "2 Versions"
+msgstr ""
+
+#: app/templates/pages/create.html:179
+msgid "Analyzing lyrics"
+msgstr ""
+
+#: app/templates/pages/create.html:183
+msgid "Creating composition"
+msgstr ""
+
+#: app/templates/pages/create.html:187
+msgid "Generating vocals"
+msgstr ""
+
+#: app/templates/pages/create.html:191
+msgid "Finalizing audio"
+msgstr ""
+
+#: app/templates/pages/create.html:201
+msgid "Generated Versions"
+msgstr ""
+
+#: app/templates/pages/create.html:212
+msgid "Selected"
+msgstr ""
+
+#: app/templates/pages/create.html:216
+msgid "Continue to Visuals"
+msgstr ""
+
+#: app/templates/pages/create.html:223
+msgid "Visuals"
+msgstr ""
+
+#: app/templates/pages/create.html:227 app/templates/pages/creation.html:107
+msgid "Cover Art"
+msgstr ""
+
+#: app/templates/pages/create.html:246 app/templates/pages/creation.html:92
+msgid "Music Video"
+msgstr ""
+
+#: app/templates/pages/create.html:282
+msgid "Describe your song to get started"
+msgstr ""
+
+#: app/templates/pages/create.html:283
+msgid "The preview will appear here"
+msgstr ""
+
+#: app/templates/pages/create.html:315
+msgid "Generate visuals to preview"
+msgstr ""
+
+#: app/templates/pages/create.html:319
+msgid "Ready to publish your creation"
+msgstr ""
+
+#: app/templates/pages/creation.html:2 app/templates/pages/creation.html:4
+#: app/templates/pages/creation.html:30 app/templates/pages/share-event.html:3
+#: app/templates/pages/share-event.html:8
+#: app/templates/pages/share-event.html:38
+#: app/templates/pages/templates.html:43
+msgid "Untitled"
+msgstr ""
+
+#: app/templates/pages/creation.html:5
+msgid "Listen to this AI created song"
+msgstr ""
+
+#: app/templates/pages/creation.html:36 app/templates/pages/explore.html:63
+#: app/templates/pages/library.html:60 app/templates/pages/share-event.html:44
+msgid "plays"
+msgstr ""
+
+#: app/templates/pages/creation.html:55 app/templates/pages/library.html:67
+msgid "Share"
+msgstr ""
+
+#: app/templates/pages/creation.html:59
+msgid "Download"
+msgstr ""
+
+#: app/templates/pages/creation.html:84
+msgid "Audio"
+msgstr ""
+
+#: app/templates/pages/creation.html:88
+msgid "No audio available"
+msgstr ""
+
+#: app/templates/pages/creation.html:96
+msgid "No music video yet"
+msgstr ""
+
+#: app/templates/pages/creation.html:102
+msgid "No lyrics available"
+msgstr ""
+
+#: app/templates/pages/creation.html:113
+msgid "No cover art"
+msgstr ""
+
+#: app/templates/pages/creation.html:120
+msgid "Created with Avireon"
+msgstr ""
+
+#: app/templates/pages/creation.html:123
+msgid "Create Your Own"
+msgstr ""
+
+#: app/templates/pages/creation.html:131
+msgid "Task Status"
+msgstr ""
+
+#: app/templates/pages/creation.html:132
+msgid "Loading..."
+msgstr ""
+
+#: app/templates/pages/creation.html:133
+msgid "No tasks found"
+msgstr ""
+
+#: app/templates/pages/creation.html:171
+msgid "Share your creation"
+msgstr ""
+
+#: app/templates/pages/creation.html:178
+msgid "Share to:"
+msgstr ""
+
+#: app/templates/pages/creation.html:185
+msgid "Close"
+msgstr ""
+
+#: app/templates/pages/explore.html:11
+msgid "Search songs..."
+msgstr ""
+
+#: app/templates/pages/explore.html:30
+msgid "No creations found"
+msgstr ""
+
+#: app/templates/pages/explore.html:31
+msgid "Be the first to create →"
+msgstr ""
+
+#: app/templates/pages/explore.html:44 app/templates/pages/templates.html:39
+msgid "MV"
+msgstr ""
+
+#: app/templates/pages/explore.html:79 app/templates/pages/library.html:77
+#: app/templates/pages/templates.html:55
+msgid "Load More"
+msgstr ""
+
+#: app/templates/pages/explore.html:157
+msgid "🎵 作品广场"
+msgstr ""
+
+#: app/templates/pages/explore.html:158
+msgid "探索社区 AI 创作的优秀作品"
+msgstr ""
+
+#: app/templates/pages/explore.html:161
+msgid "+ 新建作品"
+msgstr ""
+
+#: app/templates/pages/explore.html:172
+msgid "搜索作品标题、描述、风格..."
+msgstr ""
+
+#: app/templates/pages/explore.html:177
+msgid "最新发布"
+msgstr ""
+
+#: app/templates/pages/explore.html:178
+msgid "最多播放"
+msgstr ""
+
+#: app/templates/pages/explore.html:185
+msgid "加载作品中..."
+msgstr ""
+
+#: app/templates/pages/explore.html:191
+msgid "还没有公开作品"
+msgstr ""
+
+#: app/templates/pages/explore.html:192
+msgid "去创作第一首歌曲"
+msgstr ""
+
+#: app/templates/pages/explore.html:209
+msgid "含 MV"
+msgstr ""
+
+#: app/templates/pages/explore.html:223
+msgid "播放"
+msgstr ""
+
+#: app/templates/pages/explore.html:225
+msgid "分享"
+msgstr ""
+
+#: app/templates/pages/explore.html:237
+msgid "加载更多"
+msgstr ""
+
+#: app/templates/pages/explore.html:313
+msgid "分享链接已复制到剪贴板！"
+msgstr ""
+
+#: app/templates/pages/explore.html:315
+msgid "复制以下链接分享："
+msgstr ""
+
+#: app/templates/pages/home.html:2
+msgid "Avireon — Turn Your Idea Into Music"
+msgstr ""
+
+#: app/templates/pages/home.html:3
+msgid ""
+"AI music creation platform. Describe your song, generate lyrics, music, "
+"and music video in minutes."
+msgstr ""
+
+#: app/templates/pages/home.html:21
+msgid "Turn your idea"
+msgstr ""
+
+#: app/templates/pages/home.html:22
+msgid "into music"
+msgstr ""
+
+#: app/templates/pages/home.html:25
+msgid ""
+"Describe the song you want. AI generates lyrics, music, and a music video"
+" — all in one click."
+msgstr ""
+
+#: app/templates/pages/home.html:35
+msgid "A sad song about leaving home, cinematic, male vocal..."
+msgstr ""
+
+#: app/templates/pages/home.html:46
+msgid "Try: \"A happy pop song about summer vacation\" or \"一首关于失恋的悲伤民谣\""
+msgstr ""
+
+#: app/templates/pages/home.html:54
+msgid "Featured Creations"
+msgstr ""
+
+#: app/templates/pages/home.html:55
+msgid "View All"
+msgstr ""
+
+#: app/templates/pages/home.html:63
+msgid "No creations yet. Be the first to create something amazing!"
+msgstr ""
+
+#: app/templates/pages/home.html:101
+msgid "How It Works"
+msgstr ""
+
+#: app/templates/pages/home.html:107
+msgid "Describe"
+msgstr ""
+
+#: app/templates/pages/home.html:108
+msgid "Tell us what song you want in one sentence"
+msgstr ""
+
+#: app/templates/pages/home.html:115
+msgid "AI generates lyrics, you can edit them"
+msgstr ""
+
+#: app/templates/pages/home.html:121
+msgid "Music"
+msgstr ""
+
+#: app/templates/pages/home.html:122
+msgid "AI creates the song with vocals"
+msgstr ""
+
+#: app/templates/pages/home.html:128
+msgid "Video"
+msgstr ""
+
+#: app/templates/pages/home.html:129
+msgid "Generate a music video automatically"
+msgstr ""
+
+#: app/templates/pages/home.html:138
+msgid "Discover Music"
+msgstr ""
+
+#: app/templates/pages/home.html:139
+msgid "AI-powered music creation and exploration"
+msgstr ""
+
+#: app/templates/pages/home.html:146
+msgid "Search tracks..."
+msgstr ""
+
+#: app/templates/pages/home.html:153
+msgid "Searching..."
+msgstr ""
+
+#: app/templates/pages/home.html:162
+msgid "Create Your Own Music with AI"
+msgstr ""
+
+#: app/templates/pages/home.html:163
+msgid "Generate original songs, clone voices, or remix tracks"
+msgstr ""
+
+#: app/templates/pages/home.html:165
+msgid "Try AI Studio"
+msgstr ""
+
+#: app/templates/pages/library.html:5 app/templates/pages/library.html:156
+msgid "My Library"
+msgstr ""
+
+#: app/templates/pages/library.html:8
+msgid "New Creation"
+msgstr ""
+
+#: app/templates/pages/library.html:29
+msgid "Start creating →"
+msgstr ""
+
+#: app/templates/pages/library.html:43
+msgid "Draft"
+msgstr ""
+
+#: app/templates/pages/library.html:66
+msgid "Edit"
+msgstr ""
+
+#: app/templates/pages/library.html:126
+msgid "Link copied!"
+msgstr ""
+
+#: app/templates/pages/library.html:130
+msgid "Delete this creation?"
+msgstr ""
+
+#: app/templates/pages/library.html:157
+msgid "Sign in to see your playlists and favorites."
+msgstr ""
+
+#: app/templates/pages/settings.html:15
+msgid "Account"
+msgstr ""
+
+#: app/templates/pages/settings.html:22
+msgid "Username"
+msgstr ""
+
+#: app/templates/pages/settings.html:26
+msgid "Avatar"
+msgstr ""
+
+#: app/templates/pages/settings.html:29
+msgid "Upload Avatar"
+msgstr ""
+
+#: app/templates/pages/settings.html:37
+msgid "Language"
+msgstr ""
+
+#: app/templates/pages/settings.html:41
+msgid "简体中文"
+msgstr ""
+
+#: app/templates/pages/settings.html:48
+msgid "Generation Defaults"
+msgstr ""
+
+#: app/templates/pages/settings.html:51
+msgid "Default Song Language"
+msgstr ""
+
+#: app/templates/pages/settings.html:61
+msgid "Default Genre"
+msgstr ""
+
+#: app/templates/pages/settings.html:72
+msgid "Default Vocal"
+msgstr ""
+
+#: app/templates/pages/settings.html:84
+msgid "Privacy"
+msgstr ""
+
+#: app/templates/pages/settings.html:86
+msgid "Default Privacy for New Creations"
+msgstr ""
+
+#: app/templates/pages/settings.html:91
+msgid "Public"
+msgstr ""
+
+#: app/templates/pages/settings.html:92
+msgid "Everyone can see in Explore"
+msgstr ""
+
+#: app/templates/pages/settings.html:98
+msgid "Unlisted"
+msgstr ""
+
+#: app/templates/pages/settings.html:99
+msgid "Only people with the link can see"
+msgstr ""
+
+#: app/templates/pages/settings.html:105
+msgid "Private"
+msgstr ""
+
+#: app/templates/pages/settings.html:106
+msgid "Only you can see"
+msgstr ""
+
+#: app/templates/pages/settings.html:115
+msgid "Invite Friends"
+msgstr ""
+
+#: app/templates/pages/settings.html:117
+msgid ""
+"Share your referral link. When your friend creates their first song, you "
+"both get 10 credits!"
+msgstr ""
+
+#: app/templates/pages/settings.html:131
+msgid "Settings saved!"
+msgstr ""
+
+#: app/templates/pages/share-event.html:3
+#: app/templates/pages/share-event.html:13
+msgid "Avireon"
+msgstr ""
+
+#: app/templates/pages/share-event.html:4
+msgid "AI generated music"
+msgstr ""
+
+#: app/templates/pages/share-event.html:7
+msgid "Listen to this AI generated song on Avireon"
+msgstr ""
+
+#: app/templates/pages/share-event.html:8
+msgid "shared on Avireon"
+msgstr ""
+
+#: app/templates/pages/share-event.html:14
+msgid "Create your own"
+msgstr ""
+
+#: app/templates/pages/share-event.html:21
+msgid "🎉 You unlocked a bonus generation for the creator!"
+msgstr ""
+
+#: app/templates/pages/share-event.html:40
+#: app/templates/pages/templates.html:44
+msgid "Anonymous"
+msgstr ""
+
+#: app/templates/pages/share-event.html:45
+msgid "clicks"
+msgstr ""
+
+#: app/templates/pages/share-event.html:53
+msgid "Pause"
+msgstr ""
+
+#: app/templates/pages/share-event.html:53
+msgid "Listen"
+msgstr ""
+
+#: app/templates/pages/share-event.html:58
+msgid "Remixing..."
+msgstr ""
+
+#: app/templates/pages/share-event.html:58
+msgid "Remix this"
+msgstr ""
+
+#: app/templates/pages/templates.html:2
+msgid "Templates — Avireon"
+msgstr ""
+
+#: app/templates/pages/templates.html:7
+msgid "Template Library"
+msgstr ""
+
+#: app/templates/pages/templates.html:8
+msgid "One-click remix any template"
+msgstr ""
+
+#: app/templates/pages/templates.html:10
+msgid "Create New"
+msgstr ""
+
+#: app/templates/pages/templates.html:15
+msgid "All"
+msgstr ""
+
+#: app/templates/pages/templates.html:27
+msgid "No templates yet"
+msgstr ""
+
+#: app/templates/pages/templates.html:28
+msgid "Be the first to create"
+msgstr ""
+
+#: app/templates/pages/templates.html:47
+msgid "Remix"
+msgstr ""
+

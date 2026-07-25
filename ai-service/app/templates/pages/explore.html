@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="flex-1 max-w-7xl mx-auto w-full px-6 py-8" x-data="explore()">
+  <h1 class="text-3xl font-bold mb-6">{{ _('Explore') }}</h1>
+
+  <!-- Search + Tabs -->
+  <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
+    <!-- Search -->
+    <div class="relative flex-1 max-w-md">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input x-model="search" @input.debounce.400ms="load()" type="text" placeholder="{{ _('Search songs...') }}"
+             class="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none">
+    </div>
+    <!-- Tabs -->
+    <div class="flex gap-1 bg-gray-900 rounded-xl p-1">
+      <template x-for="t in tabs" :key="t.id">
+        <button @click="activeTab = t.id; load()" :class="activeTab === t.id ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition" x-text="t.label"></button>
+      </template>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div x-show="loading" class="text-center py-16">
+    <div class="inline-block w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+
+  <!-- Empty -->
+  <div x-show="!loading && items.length === 0" class="text-center py-16">
+    <p class="text-gray-500 text-lg">{{ _('No creations found') }}</p>
+    <a href="/create" class="text-purple-400 hover:text-purple-300 transition mt-2 inline-block">{{ _('Be the first to create →') }}</a>
+  </div>
+
+  <!-- Grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <template x-for="item in items" :key="item.id">
+      <div class="group bg-gray-900 rounded-xl overflow-hidden border border-gray-800 hover:border-gray-600 transition">
+        <a :href="`/creation/${item.id}`" class="block aspect-square bg-gray-800 relative overflow-hidden">
+          <img x-show="item.cover_url" :src="item.cover_url" :alt="item.title" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+          <div x-show="!item.cover_url" class="w-full h-full flex items-center justify-center">
+            <svg class="w-16 h-16 text-gray-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          </div>
+          <!-- MV badge -->
+          <div x-show="item.video_url" class="absolute top-2 left-2 bg-purple-600/80 text-white text-xs px-2 py-0.5 rounded-full">{{ _('MV') }}</div>
+          <!-- Play overlay -->
+          <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+            <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+              <svg class="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
+        </a>
+        <div class="p-4">
+          <a :href="`/creation/${item.id}`">
+            <h3 class="font-semibold truncate hover:text-purple-400 transition" x-text="item.title || 'Untitled'"></h3>
+          </a>
+          <p class="text-sm text-gray-500 mt-1 truncate">
+            <span x-text="item.style_tags || ''"></span>
+            <span x-show="item.language"> · </span>
+            <span x-text="item.language || ''"></span>
+          </p>
+          <div class="flex items-center justify-between mt-3">
+            <div class="flex items-center gap-3 text-xs text-gray-500">
+              <span x-text="`${item.plays_count || 0} {{ _('plays') }}`"></span>
+            </div>
+            <!-- Like button -->
+            <button @click.prevent="toggleLike(item)" class="flex items-center gap-1 text-sm transition"
+                    :class="item._liked ? 'text-pink-500' : 'text-gray-500 hover:text-pink-400'">
+              <span x-text="item._liked ? '❤' : '♡'"></span>
+              <span x-text="item.likes_count || 0"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Load More -->
+  <div x-show="!loading && hasMore" class="text-center mt-8">
+    <button @click="loadMore()" class="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2.5 rounded-xl transition">{{ _('Load More') }}</button>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function explore() {
+  return {
+    tabs: [
+      { id: 'new', label: 'New' },
+      { id: 'trending', label: 'Trending' },
+      { id: 'videos', label: 'Music Videos' },
+    ],
+    activeTab: 'new',
+    search: '',
+    items: [],
+    loading: true,
+    offset: 0,
+    limit: 20,
+    hasMore: false,
+
+    init() { this.load(); },
+
+    async load() {
+      this.loading = true;
+      this.offset = 0;
+      try {
+        const sort = this.activeTab === 'trending' ? 'plays_count' : 'created_at';
+        const params = new URLSearchParams({
+          tab: this.activeTab,
+          sort: sort,
+          limit: this.limit,
+          offset: 0,
+        });
+        if (this.search) params.set('q', this.search);
+        const res = await fetch(`/api/v1/explore?${params}`);
+        const data = await res.json();
+        this.items = (data.items || []).map(i => ({ ...i, _liked: false }));
+        this.hasMore = this.items.length >= this.limit;
+      } catch (e) { console.error(e); }
+      this.loading = false;
+    },
+
+    async loadMore() {
+      this.offset += this.limit;
+      try {
+        const sort = this.activeTab === 'trending' ? 'plays_count' : 'created_at';
+        const params = new URLSearchParams({
+          tab: this.activeTab, sort, limit: this.limit, offset: this.offset,
+        });
+        if (this.search) params.set('q', this.search);
+        const res = await fetch(`/api/v1/explore?${params}`);
+        const data = await res.json();
+        const newItems = (data.items || []).map(i => ({ ...i, _liked: false }));
+        this.items.push(...newItems);
+        this.hasMore = newItems.length >= this.limit;
+      } catch (e) { console.error(e); }
+    },
+
+    async toggleLike(item) {
+      try {
+        const res = await fetch(`/api/v1/works/${item.id}/like`, { method: 'POST' });
+        const data = await res.json();
+        item._liked = data.liked;
+        item.likes_count = (item.likes_count || 0) + (data.liked ? 1 : -1);
+      } catch (e) { console.error(e); }
+    },
+  };
+}
+</script>
+{% endblock %}
+

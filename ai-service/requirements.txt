@@ -1,0 +1,45 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Jinja2 templates (FastAPI built-in support)
+jinja2==3.1.4
+
+# Static files (FastAPI built-in support)
+
+# HTTP client
+httpx==0.28.1
+
+# Settings
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Database (SQLite + async driver)
+aiosqlite==0.21.0
+
+# Auth (FastAPI Users + JWT)
+# fastapi-users[oauth]==14.0.0
+bcrypt==4.2.1
+PyJWT==2.10.1
+
+# Logging
+loguru==0.7.3
+
+# Audio processing (lazy loaded for sovits_engine)
+# numpy==2.2.1
+# soundfile==0.12.1
+# librosa==0.10.2.post1
+
+# R2 upload (S3 compatible)
+boto3==1.35.86
+
+# LLM SDKs
+openai==1.58.1
+
+# Rate limiting
+slowapi==0.1.9
+
+# Utils
+python-dotenv==1.0.1
+tenacity==9.0.0

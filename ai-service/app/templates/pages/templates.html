@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block head %}<title>{{ _('Templates — Avireon') }}</title>{% endblock %}
+{% block content %}
+<main class="flex-1 max-w-7xl mx-auto w-full px-6 py-8" x-data="templateLib()">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-bold">{{ _('Template Library') }}</h1>
+      <p class="text-gray-400 mt-1">{{ _('One-click remix any template') }}</p>
+    </div>
+    <a href="/create" class="bg-purple-600 hover:bg-purple-500 px-5 py-2.5 rounded-xl text-sm font-medium transition">{{ _('Create New') }} →</a>
+  </div>
+
+  <!-- Style filter tabs -->
+  <div class="flex gap-2 mb-8 flex-wrap">
+    <button @click="styleFilter = ''; load()" :class="styleFilter === '' ? 'bg-purple-600' : 'bg-gray-800 hover:bg-gray-700'"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition">{{ _('All') }}</button>
+    <template x-for="s in styles" :key="s">
+      <button @click="styleFilter = s; load()" :class="styleFilter === s ? 'bg-purple-600' : 'bg-gray-800 hover:bg-gray-700'"
+              class="px-4 py-2 rounded-lg text-sm font-medium transition" x-text="s"></button>
+    </template>
+  </div>
+
+  <div x-show="loading" class="text-center py-16">
+    <div class="inline-block w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+
+  <div x-show="!loading && items.length === 0" class="text-center py-16">
+    <p class="text-gray-500 text-lg">{{ _('No templates yet') }}</p>
+  </div>
+
+  <!-- Template grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <template x-for="item in items" :key="item.id">
+      <div class="group bg-gray-900 rounded-xl overflow-hidden border border-gray-800 hover:border-purple-600/50 transition">
+        <!-- Cover with gradient placeholder -->
+        <div @click="preview(item)" class="block aspect-video bg-gray-800 relative overflow-hidden cursor-pointer">
+          <img x-show="item.cover_img" :src="item.cover_img" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+          <div x-show="!item.cover_img"
+               class="w-full h-full flex items-center justify-center text-4xl font-bold bg-gradient-to-br"
+               :class="gradientFor(item.id)">
+            <span class="text-white/30" x-text="item.template_name?.charAt(0) || '♪'"></span>
+          </div>
+        </div>
+        <div class="p-4">
+          <div class="flex flex-wrap gap-1 mb-2">
+            <template x-for="tag in (item.style_tags || '').split(',')" :key="tag">
+              <span class="text-xs bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded-full" x-text="tag.trim()"></span>
+            </template>
+          </div>
+          <h3 class="font-semibold text-lg" x-text="item.template_name"></h3>
+          <div class="flex gap-2 mt-3">
+            <button @click="useIt(item)" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg py-2 text-sm font-medium transition">
+              {{ _('Use Template') }}
+            </button>
+            <button @click="preview(item)" class="bg-gray-800 hover:bg-gray-700 text-gray-400 px-3 rounded-lg text-sm transition">
+              {{ _('Preview') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <div x-show="hasMore && !loading" class="text-center mt-8">
+    <button @click="offset += limit; load()" class="bg-gray-800 hover:bg-gray-700 px-6 py-2.5 rounded-xl text-sm transition">{{ _('Load More') }}</button>
+  </div>
+
+  <!-- Preview modal -->
+  <div x-show="showPreview" x-cloak @click.self="showPreview = false" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-900 rounded-2xl border border-gray-800 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold" x-text="previewItem?.template_name"></h2>
+          <button @click="showPreview = false" class="text-gray-500 hover:text-white text-xl">&times;</button>
+        </div>
+        <div class="flex flex-wrap gap-1 mb-4">
+          <template x-for="tag in (previewItem?.style_tags || '').split(',')" :key="tag">
+            <span class="text-xs bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded-full" x-text="tag.trim()"></span>
+          </template>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <h3 class="text-sm font-semibold text-purple-400 mb-1">{{ _('Lyric Template') }}</h3>
+            <pre class="bg-gray-800 rounded-lg p-3 text-sm text-gray-300 whitespace-pre-wrap font-sans max-h-40 overflow-y-auto" x-text="previewItem?.lyric_template || '—'"></pre>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-purple-400 mb-1">{{ _('Music Prompt') }}</h3>
+            <p class="bg-gray-800 rounded-lg p-3 text-sm text-gray-300" x-text="previewItem?.music_prompt || '—'"></p>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-purple-400 mb-1">{{ _('MV Scene Prompt') }}</h3>
+            <p class="bg-gray-800 rounded-lg p-3 text-sm text-gray-300" x-text="previewItem?.mv_prompt || '—'"></p>
+          </div>
+        </div>
+
+        <button @click="useIt(previewItem)" class="mt-6 w-full bg-purple-600 hover:bg-purple-500 text-white rounded-xl py-3 font-semibold transition">
+          {{ _('Use This Template') }}
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+  function templateLib() {
+    return {
+      items: [],
+      styles: ['古风', '流行', '说唱', '赛博朋克', '治愈', '短剧'],
+      styleFilter: '',
+      loading: false,
+      hasMore: true,
+      limit: 20,
+      offset: 0,
+      showPreview: false,
+      previewItem: null,
+
+      init() { this.load(); },
+
+      async load() {
+        this.loading = true;
+        try {
+          const params = new URLSearchParams({ limit: this.limit, offset: this.offset });
+          if (this.styleFilter) params.set('style', this.styleFilter);
+          const res = await fetch('/api/v1/templates/list?' + params);
+          const data = await res.json();
+          this.items = data.items || [];
+          this.hasMore = (this.offset + this.limit) < (data.pagination?.total || 0);
+        } catch (e) { console.error(e); }
+        this.loading = false;
+      },
+
+      preview(item) {
+        this.previewItem = item;
+        this.showPreview = true;
+      },
+
+      async useIt(item) {
+        try {
+          const form = new FormData();
+          form.append('user_id', '1');
+          const res = await fetch(`/api/v1/creations/use-template/${item.id}`, { method: 'POST', body: form });
+          const data = await res.json();
+          if (data.success) {
+            sessionStorage.setItem('template_data', JSON.stringify(data.data));
+            window.location.href = '/create';
+          }
+        } catch (e) { console.error('Use template failed:', e); }
+      },
+
+      gradientFor(id) {
+        const grads = [
+          'from-purple-900 to-blue-900',
+          'from-pink-900 to-red-900',
+          'from-green-900 to-teal-900',
+          'from-yellow-900 to-orange-900',
+          'from-indigo-900 to-purple-900',
+          'from-red-900 to-pink-900',
+        ];
+        return grads[id % grads.length];
+      },
+    };
+  }
+</script>
+{% endblock %}
