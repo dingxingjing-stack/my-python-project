@@ -1,13 +1,8 @@
-"""通用 LLM 客户端 — 工厂模式 + 多源路由 + 指数退避重试。
+"""通用 LLM 客户端 — 工厂模式 + 硅基流动/OpenRouter 双路路由 + 指数退避重试。
 
-路由策略（二选一）：
-
-1. RELAY 模式（推荐）：
-   配置 relay_api_base + relay_api_key 后，ALL providers
-   共用同一中转地址，仅 model 名不同。
-
-2. 直连模式（relay 为空时自动启用）：
-   每个 provider 独立 base_url + api_key，互不共享。
+路由策略：
+  siliconflow → OpenAI 兼容客户端，使用 SILICONFLOW_API_KEY
+  openrouter  → OpenAI 兼容客户端，使用 OPENROUTER_API_KEY
 
 所有 public 方法带 @retry（指数退避 2s→4s→8s）。
 """
@@ -33,14 +28,11 @@ from app.models.schemas import LyricsRequest
 # 异常
 # ---------------------------------------------------------------------------
 
-
 class LLMError(Exception):
     ...
 
-
 class LLMNotConfiguredError(LLMError):
     ...
-
 
 class LLMResponseError(LLMError):
     ...
@@ -78,54 +70,40 @@ _RETRY_ARGS = dict(
     reraise=True,
 )
 
+_PROVIDER_MAP: list[tuple[str, str, str, str]] = []
+
+
+def _build_provider_map() -> list[tuple[str, str, str, str]]:
+    """懒构建 provider 映射表，确保每次都读最新环境变量。"""
+    s = get_settings()
+    providers = []
+    if s.siliconflow_api_key:
+        providers.append(("siliconflow", s.siliconflow_api_key, s.siliconflow_base_url, s.siliconflow_text_model))
+    if s.openrouter_api_key:
+        providers.append(("openrouter", s.openrouter_api_key, s.openrouter_base_url, s.openrouter_text_fallback))
+    return providers
+
 
 # ---------------------------------------------------------------------------
 # 工厂
 # ---------------------------------------------------------------------------
 
-
 class LLMClient:
-    """统一 LLM 接口 — relay 优先，直连备用。"""
+    """统一 LLM 接口 — 硅基流动优先，OpenRouter 备用。"""
 
     def __init__(self) -> None:
-        s = get_settings()
         self._clients: dict[str, AsyncOpenAI] = {}
         self._model_map: dict[str, str] = {}
 
-        # ── RELAY 模式：所有 provider 共用中转 ──
-        if s.relay_api_key:
-            logger.info("RELAY 模式：所有 provider 共用 {}", s.relay_api_base)
-            for name, model in [
-                ("deepseek", s.deepseek_model),
-                ("nvidia",   s.nvidia_model),
-                ("glm",      s.glm_model),
-                ("openai",   s.openai_model),
-            ]:
-                if not model:
-                    continue
-                self._clients[name] = AsyncOpenAI(
-                    base_url=s.relay_api_base,
-                    api_key=s.relay_api_key,
-                )
-                self._model_map[name] = model
-                logger.info("  {} → model={}", name, model)
-            if not self._clients:
-                logger.warning("RELAY 已配置但所有 model 名为空")
+        for name, key, base, model in _build_provider_map():
+            if not key or not model:
+                continue
+            self._clients[name] = AsyncOpenAI(base_url=base.rstrip("/") + "/v1", api_key=key)
+            self._model_map[name] = model
+            logger.info("LLMClient: {} → base={} model={}", name, base, model)
 
-        # ── 直连模式：各 provider 独立 ──
-        else:
-            logger.info("直连模式：各 provider 独立配置")
-            for name, key, base, model in [
-                ("deepseek", s.deepseek_api_key, s.deepseek_base_url, s.deepseek_model),
-                ("nvidia",   s.nvidia_api_key,   s.nvidia_base_url,   s.nvidia_model),
-                ("glm",      s.glm_api_key,      s.glm_base_url,      s.glm_model),
-                ("openai",   s.openai_api_key,   s.openai_base_url,   s.openai_model),
-            ]:
-                if not key or not model:
-                    continue
-                self._clients[name] = AsyncOpenAI(base_url=base, api_key=key)
-                self._model_map[name] = model
-                logger.info("  {} → base={} model={}", name, base, model)
+        if not self._clients:
+            logger.warning("LLMClient 无可用 provider (SILICONFLOW_API_KEY 或 OPENROUTER_API_KEY 均未配置)")
 
     # ------------------------------------------------------------------
     # 通用对话
@@ -135,7 +113,7 @@ class LLMClient:
     async def chat(
         self,
         messages: list[dict[str, str]],
-        provider: str = "deepseek",
+        provider: str = "siliconflow",
         temperature: float = 0.7,
         max_tokens: int = 2048,
         response_format: Optional[dict[str, str]] = None,
@@ -161,7 +139,7 @@ class LLMClient:
     async def chat_stream(
         self,
         messages: list[dict[str, str]],
-        provider: str = "deepseek",
+        provider: str = "siliconflow",
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> AsyncGenerator[str, None]:
@@ -186,7 +164,7 @@ class LLMClient:
     async def chat_structured(
         self,
         messages: list[dict[str, str]],
-        provider: str = "deepseek",
+        provider: str = "siliconflow",
         temperature: float = 0.3,
         max_tokens: int = 4096,
     ) -> dict[str, Any]:
@@ -211,7 +189,7 @@ class LLMClient:
         self,
         system_prompt: str,
         user_prompt: str,
-        provider: str = "deepseek",
+        provider: str = "siliconflow",
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> str:
@@ -311,6 +289,5 @@ class LLMClient:
 
 def get_llm_client() -> LLMClient:
     return LLMClient()
-
 
 get_lyrics_client = get_llm_client
