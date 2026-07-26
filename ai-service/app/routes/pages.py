@@ -32,12 +32,6 @@ class I18nTemplates(Jinja2Templates):
 _templates = I18nTemplates(directory="app/templates")
 
 
-@router.get("/", response_class=HTMLResponse, include_in_schema=False)
-async def home(request: Request):
-    """首页 — 极简创作入口。"""
-    return _templates.TemplateResponse(request, "pages/home.html")
-
-
 @router.get("/create", response_class=HTMLResponse, include_in_schema=False)
 async def create(request: Request):
     """四步创作向导。"""
@@ -120,6 +114,12 @@ async def share_short_link(request: Request, code: str):
 async def templates_page(request: Request):
     """创作模板库页面。"""
     return _templates.TemplateResponse(request, "pages/templates.html")
+
+
+@router.get("/console", response_class=HTMLResponse, include_in_schema=False)
+async def console_page(request: Request):
+    """产品控制台（登录后进入）。"""
+    return _templates.TemplateResponse(request, "pages/console.html")
 
 
 @router.get("/admin", response_class=HTMLResponse, include_in_schema=False)

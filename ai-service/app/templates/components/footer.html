@@ -1,53 +1,52 @@
-<footer class="border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 mt-auto">
+<footer class="border-t border-gray-200 bg-white mt-auto">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
       <!-- Product -->
       <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4" x-text="t('Product')">Product</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4" x-text="t('Product')">{{ _('Product') }}</h3>
         <ul class="space-y-2">
-          <li><a href="/create" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('AI Music Generation')">AI Music</a></li>
-          <li><a href="/create" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Lyrics Generator')">Lyrics</a></li>
-          <li><a href="/templates" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('MV Templates')">MV Templates</a></li>
-          <li><a href="/explore" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Explore')">Explore</a></li>
+          <li><a href="/create" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('AI Music Generation')">{{ _('AI Music Generation') }}</a></li>
+          <li><a href="/create" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Lyrics Generator')">{{ _('Lyrics Generator') }}</a></li>
+          <li><a href="/create" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Text to Speech')">{{ _('Text to Speech') }}</a></li>
+          <li><a href="/create" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('MV Templates')">{{ _('MV Templates') }}</a></li>
         </ul>
       </div>
-      <!-- Solutions -->
+      <!-- Documentation -->
       <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4" x-text="t('Solutions')">Solutions</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4" x-text="t('Documentation')">{{ _('Documentation') }}</h3>
         <ul class="space-y-2">
-          <li><a href="/enterprise" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('For Studios')">For Studios</a></li>
-          <li><a href="/enterprise" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('For Creators')">For Creators</a></li>
-          <li><a href="/enterprise" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('For Business')">For Business</a></li>
+          <li><a href="/docs" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Quick Start')">{{ _('Quick Start') }}</a></li>
+          <li><a href="/docs" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('API Reference')">{{ _('API Reference') }}</a></li>
+          <li><a href="/docs" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Integration Guide')">{{ _('Integration Guide') }}</a></li>
         </ul>
       </div>
-      <!-- Developers -->
+      <!-- Pricing -->
       <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4" x-text="t('Developers')">Developers</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4" x-text="t('Pricing')">{{ _('Pricing') }}</h3>
         <ul class="space-y-2">
-          <li><a href="/docs" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('API Docs')">API Docs</a></li>
-          <li><a href="/docs" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Integration Guide')">Integration</a></li>
-          <li><a href="/docs" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Status')">Status</a></li>
+          <li><a href="/pricing" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Starter')">{{ _('Starter') }}</a></li>
+          <li><a href="/pricing" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Professional')">{{ _('Professional') }}</a></li>
+          <li><a href="/pricing" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Enterprise')">{{ _('Enterprise') }}</a></li>
         </ul>
       </div>
-      <!-- Company -->
+      <!-- Contact -->
       <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4" x-text="t('Company')">Company</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4" x-text="t('Contact')">{{ _('Contact') }}</h3>
         <ul class="space-y-2">
-          <li><a href="/about" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('About')">About</a></li>
-          <li><a href="/blog" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Blog')">Blog</a></li>
-          <li><a href="/contact" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Contact')">Contact</a></li>
+          <li><a href="/contact" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Contact Us')">{{ _('Contact Us') }}</a></li>
+          <li><a href="/about" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('About')">{{ _('About') }}</a></li>
         </ul>
       </div>
     </div>
-    <div class="border-t border-gray-200 dark:border-gray-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="border-t border-gray-200 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-2">
-        <span class="text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-500 dark:from-purple-400 dark:to-pink-500 bg-clip-text text-transparent">Avireon</span>
-        <span class="text-sm text-gray-500 dark:text-gray-500">© 2026</span>
+        <span class="text-lg font-bold text-blue-700">Avireon</span>
+        <span class="text-sm text-gray-500">© 2026</span>
       </div>
-      <div class="flex items-center gap-6 text-sm text-gray-500 dark:text-gray-500">
-        <a href="/privacy" class="hover:text-gray-700 dark:hover:text-gray-300 transition" x-text="t('Privacy Policy')">Privacy</a>
-        <a href="/terms" class="hover:text-gray-700 dark:hover:text-gray-300 transition" x-text="t('Terms of Service')">Terms</a>
-        <a href="/contact" class="hover:text-gray-700 dark:hover:text-gray-300 transition" x-text="t('Contact Us')">Contact</a>
+      <div class="flex items-center gap-6 text-sm text-gray-500">
+        <a href="/privacy" class="hover:text-blue-700 transition" x-text="t('Privacy Policy')">{{ _('Privacy Policy') }}</a>
+        <a href="/terms" class="hover:text-blue-700 transition" x-text="t('Terms of Service')">{{ _('Terms of Service') }}</a>
+        <a href="/contact" class="hover:text-blue-700 transition" x-text="t('Contact Us')">{{ _('Contact Us') }}</a>
       </div>
     </div>
   </div>

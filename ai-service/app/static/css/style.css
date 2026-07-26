@@ -1,0 +1,12 @@
+/* Avireon Enterprise Site Styles */
+.hero-bg {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #e0f2fe 100%);
+}
+.feature-card {
+  transition: all 0.2s ease;
+}
+.feature-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px -8px rgba(37, 99, 235, 0.1);
+}
+[x-cloak] { display: none !important; }

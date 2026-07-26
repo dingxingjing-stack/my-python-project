@@ -1,46 +1,50 @@
 {% extends "base.html" %}
-{% block title %}{{ _('Avireon — AI Music Creation Platform for Enterprise') }}{% endblock %}
-{% block description %}{{ _('Generate original music, clone voices, create music videos with AI. Enterprise-grade audio platform for studios, creators, and businesses.') }}{% endblock %}
+{% block title %}Avireon — {{ _('AI-Powered Music Creation Platform for Enterprise') }}{% endblock %}
+{% block description %}{{ _('Avireon is an AI-powered music creation platform for enterprises. Generate original music, lyrics, voiceovers, and music videos — all through an automated enterprise workflow.') }}{% endblock %}
 {% block head %}
 <style>
-  .hero-glow {
-    background: radial-gradient(ellipse at 50% 0%, rgba(139, 92, 246, 0.12) 0%, transparent 60%);
+  .hero-bg {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #e0f2fe 100%);
+  }
+  .feature-card {
+    transition: all 0.2s ease;
   }
   .feature-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(139, 92, 246, 0.08);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -8px rgba(37, 99, 235, 0.1);
   }
 </style>
 {% endblock %}
 {% block content %}
 
 <!-- ─── Hero Section ─── -->
-<section class="hero-glow pt-20 pb-16 sm:pt-28 sm:pb-20 px-4">
+<section class="hero-bg pt-20 pb-16 sm:pt-28 sm:pb-20 px-4">
   <div class="max-w-5xl mx-auto text-center">
-    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 mb-8">
-      <span class="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
-      <span x-text="t('AI Music Platform v2.0 — Now in Public Beta')">AI Music Platform v2.0 — Now in Public Beta</span>
-    </div>
-    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
-      <span x-text="t('Turn Your Ideas Into')">Turn Your Ideas Into</span><br>
-      <span class="bg-gradient-to-r from-purple-600 to-pink-500 dark:from-purple-400 dark:to-pink-500 bg-clip-text text-transparent" x-text="t('Professional Music')">Professional Music</span>
+    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight text-gray-900">
+      <span x-text="t('AI-Powered One-Stop Music Creation Platform')">{{ _('AI-Powered One-Stop Music Creation Platform') }}</span>
     </h1>
-    <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10" x-text="t('AI-powered music generation, voice cloning, and MV creation — all in one enterprise-grade platform. No studio required.')">
-      AI-powered music generation, voice cloning, and MV creation — all in one enterprise-grade platform. No studio required.
+    <p class="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto mb-10 leading-relaxed" x-text="t('Enable music generation, lyric creation, voice processing, and audio post-production to enter enterprise-grade workflows — efficiently, at scale, with AI.')">
+      {{ _('Enable music generation, lyric creation, voice processing, and audio post-production to enter enterprise-grade workflows — efficiently, at scale, with AI.') }}
     </p>
     <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-      <a href="/create" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-base font-semibold text-white bg-purple-600 hover:bg-purple-500 transition shadow-lg shadow-purple-500/20">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
-        <span x-text="t('Generate Music Free')">Generate Music Free</span>
+      <a href="/create" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg text-base font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow-lg shadow-blue-500/20">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+        <span x-text="t('Try Music Generation Free')">{{ _('Try Music Generation Free') }}</span>
       </a>
-      <a href="/enterprise" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition border border-gray-200 dark:border-gray-700">
-        <span x-text="t('View Enterprise Plan')">View Enterprise Plan</span>
+      <a href="/enterprise" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg text-base font-medium text-gray-700 bg-white hover:bg-gray-50 transition border border-gray-300 shadow-sm">
+        <span x-text="t('View Enterprise Plan')">{{ _('View Enterprise Plan') }}</span>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
       </a>
     </div>
-    <div class="mt-10 flex items-center justify-center gap-8 text-sm text-gray-500 dark:text-gray-500">
-      <span class="flex items-center gap-1.5">🎵 <span x-text="t('No credit card required')">No credit card required</span></span>
-      <span class="flex items-center gap-1.5">⚡ <span x-text="t('10 free generations daily')">10 free generations daily</span></span>
+    <div class="mt-10 flex items-center justify-center gap-8 text-sm text-gray-500">
+      <span class="flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span x-text="t('No credit card required')">{{ _('No credit card required') }}</span>
+      </span>
+      <span class="flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span x-text="t('Daily free quota included')">{{ _('Daily free quota included') }}</span>
+      </span>
     </div>
   </div>
 </section>
@@ -48,196 +52,93 @@
 <!-- ─── Features Grid (Stage 1) ─── -->
 <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
   <div class="text-center mb-14">
-    <h2 class="text-3xl sm:text-4xl font-bold mb-4" x-text="t('Everything You Need to Create Music')">Everything You Need to Create Music</h2>
-    <p class="text-lg text-gray-600 dark:text-gray-400 max-w-xl mx-auto" x-text="t('Core features available now in public beta. Professional tools coming soon.')">Core features available now in public beta. Professional tools coming soon.</p>
+    <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4" x-text="t('Core Capabilities')">{{ _('Core Capabilities') }}</h2>
+    <p class="text-lg text-gray-500 max-w-xl mx-auto" x-text="t('Four core AI-powered tools available now. Professional production tools coming in subsequent phases.')">{{ _('Four core AI-powered tools available now. Professional production tools coming in subsequent phases.') }}</p>
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
     <!-- AI Music Generation -->
-    <div class="feature-card p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 transition duration-200">
-      <div class="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-xl mb-4">🎵</div>
-      <h3 class="text-lg font-semibold mb-2" x-text="t('AI Music Generation')">AI Music Generation</h3>
-      <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed" x-text="t('Describe your song in words. AI generates complete music with vocals in minutes.')">Describe your song in words. AI generates complete music with vocals in minutes.</p>
+    <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+      <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">🎵</div>
+      <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('AI Music Generation')">{{ _('AI Music Generation') }}</h3>
+      <p class="text-sm text-gray-500 leading-relaxed" x-text="t('Describe your song. AI generates complete music with vocals in minutes.')">{{ _('Describe your song. AI generates complete music with vocals in minutes.') }}</p>
     </div>
     <!-- Lyrics Generator -->
-    <div class="feature-card p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 transition duration-200">
-      <div class="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-xl mb-4">📝</div>
-      <h3 class="text-lg font-semibold mb-2" x-text="t('Smart Lyrics Generator')">Smart Lyrics Generator</h3>
-      <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed" x-text="t('AI writes lyrics in any style and language. Generate verses, chorus, and LRC format.')">AI writes lyrics in any style and language. Generate verses, chorus, and LRC format.</p>
+    <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+      <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">📝</div>
+      <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('Lyrics Creation')">{{ _('Lyrics Creation') }}</h3>
+      <p class="text-sm text-gray-500 leading-relaxed" x-text="t('AI writes lyrics in any style and language. Generate verses, chorus, and LRC format.')">{{ _('AI writes lyrics in any style and language. Generate verses, chorus, and LRC format.') }}</p>
     </div>
     <!-- TTS -->
-    <div class="feature-card p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 transition duration-200">
-      <div class="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center text-xl mb-4">🔊</div>
-      <h3 class="text-lg font-semibold mb-2" x-text="t('Text-to-Speech')">Text-to-Speech</h3>
-      <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed" x-text="t('Convert text to natural vocals. Multiple voice options and languages supported.')">Convert text to natural vocals. Multiple voice options and languages supported.</p>
+    <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+      <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">🔊</div>
+      <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('Voice Synthesis')">{{ _('Voice Synthesis') }}</h3>
+      <p class="text-sm text-gray-500 leading-relaxed" x-text="t('Convert text to natural speech. Multiple voice options and languages supported.')">{{ _('Convert text to natural speech. Multiple voice options and languages supported.') }}</p>
     </div>
-    <!-- MV Simple -->
-    <div class="feature-card p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 transition duration-200">
-      <div class="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-xl mb-4">🎬</div>
-      <h3 class="text-lg font-semibold mb-2" x-text="t('Music Video Templates')">Music Video Templates</h3>
-      <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed" x-text="t('Auto-generate MV from your song. Choose from multiple visual styles and templates.')">Auto-generate MV from your song. Choose from multiple visual styles and templates.</p>
-    </div>
-    <!-- One-Click Create -->
-    <div class="feature-card p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 transition duration-200">
-      <div class="w-10 h-10 rounded-xl bg-pink-100 dark:bg-pink-900/40 flex items-center justify-center text-xl mb-4">✨</div>
-      <h3 class="text-lg font-semibold mb-2" x-text="t('One-Click Creation')">One-Click Creation</h3>
-      <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed" x-text="t('Full pipeline: lyrics → music → cover → MV in a single click.')">Full pipeline: lyrics → music → cover → MV in a single click.</p>
-    </div>
-    <!-- Templates -->
-    <div class="feature-card p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 transition duration-200">
-      <div class="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-xl mb-4">📋</div>
-      <h3 class="text-lg font-semibold mb-2" x-text="t('Style Templates')">Style Templates</h3>
-      <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed" x-text="t('Pre-built templates for pop, rock, hip-hop, EDM, lo-fi, and more.')">Pre-built templates for pop, rock, hip-hop, EDM, lo-fi, and more.</p>
+    <!-- MV -->
+    <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+      <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">🎬</div>
+      <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('MV Generation')">{{ _('MV Generation') }}</h3>
+      <p class="text-sm text-gray-500 leading-relaxed" x-text="t('Auto-generate music videos from your songs. Multiple visual styles available.')">{{ _('Auto-generate music videos from your songs. Multiple visual styles available.') }}</p>
     </div>
   </div>
 </section>
 
-<!-- ─── Pro Studio (Collapsible Heavy Features) ─── -->
-<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-  <div x-data="{ open: false }" class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 overflow-hidden">
-    <button @click="open = !open" class="w-full flex items-center justify-between p-6 text-left">
-      <div>
-        <h2 class="text-xl font-bold flex items-center gap-2">
-          <span x-text="t('Pro Studio')">Pro Studio</span>
-          <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300" x-text="t('Coming Soon')">Coming Soon</span>
-        </h2>
-        <p class="text-sm text-gray-500 dark:text-gray-500 mt-1" x-text="t('Advanced professional tools for music production — collapsed by default')">Advanced professional tools for music production</p>
-      </div>
-      <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-    </button>
-    <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
-      <div class="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div class="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 opacity-60">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">🎤</span><h4 class="font-medium text-sm" x-text="t('Voice Cloning')">Voice Cloning</h4></div>
-          <p class="text-xs text-gray-500 dark:text-gray-400" x-text="t('Clone any voice with a short audio sample')">Clone any voice with a short audio sample</p>
-        </div>
-        <div class="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 opacity-60">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">🔄</span><h4 class="font-medium text-sm" x-text="t('Remix / Remaster')">Remix / Remaster</h4></div>
-          <p class="text-xs text-gray-500 dark:text-gray-400" x-text="t('Remix existing tracks with AI-powered tools')">Remix existing tracks with AI-powered tools</p>
-        </div>
-        <div class="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 opacity-60">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">🔀</span><h4 class="font-medium text-sm" x-text="t('Stem Separation')">Stem Separation</h4></div>
-          <p class="text-xs text-gray-500 dark:text-gray-400" x-text="t('Split audio into vocals, drums, bass, and more')">Split audio into vocals, drums, bass, and more</p>
-        </div>
-        <div class="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 opacity-60">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">🎛️</span><h4 class="font-medium text-sm" x-text="t('Mastering')">Mastering</h4></div>
-          <p class="text-xs text-gray-500 dark:text-gray-400" x-text="t('AI-powered audio mastering for professional quality')">AI-powered audio mastering</p>
-        </div>
-        <div class="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 opacity-60">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">🎬</span><h4 class="font-medium text-sm" x-text="t('Advanced MV')">Advanced MV</h4></div>
-          <p class="text-xs text-gray-500 dark:text-gray-400" x-text="t('Full MV production with AI storyboard + video generation')">Full MV production with AI storyboard</p>
-        </div>
-        <div class="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 opacity-60">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">👥</span><h4 class="font-medium text-sm" x-text="t('Multi-Collab')">Multi-Collab</h4></div>
-          <p class="text-xs text-gray-500 dark:text-gray-400" x-text="t('Collaborate with your team in real-time')">Collaborate with your team in real-time</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── Enterprise / Customer Section ─── -->
-<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-    <div>
-      <h2 class="text-3xl sm:text-4xl font-bold mb-6" x-text="t('Built for Music Professionals')">Built for Music Professionals</h2>
-      <p class="text-lg text-gray-600 dark:text-gray-400 mb-8" x-text="t('Whether you are a studio, content creator, or business — Avireon gives you the tools to produce professional music at scale.')">
-        Whether you are a studio, content creator, or business — Avireon gives you the tools to produce professional music at scale.
-      </p>
-      <div class="space-y-4">
-        <div class="flex items-start gap-3">
-          <div class="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg class="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          </div>
-          <div><p class="font-medium" x-text="t('For Music Studios')">For Music Studios</p><p class="text-sm text-gray-500 dark:text-gray-400" x-text="t('Bulk generation, voice cloning, mastering pipeline')">Bulk generation, voice cloning, mastering pipeline</p></div>
-        </div>
-        <div class="flex items-start gap-3">
-          <div class="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg class="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          </div>
-          <div><p class="font-medium" x-text="t('For Content Creators')">For Content Creators</p><p class="text-sm text-gray-500 dark:text-gray-400" x-text="t('Quick music generation for videos, podcasts, and streams')">Quick music generation for videos, podcasts, and streams</p></div>
-        </div>
-        <div class="flex items-start gap-3">
-          <div class="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg class="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          </div>
-          <div><p class="font-medium" x-text="t('For Business')">For Business</p><p class="text-sm text-gray-500 dark:text-gray-400" x-text="t('Custom branding, API access, dedicated support')">Custom branding, API access, dedicated support</p></div>
-        </div>
-      </div>
-      <a href="/enterprise" class="inline-flex items-center gap-2 mt-8 text-purple-600 dark:text-purple-400 font-medium hover:underline">
-        <span x-text="t('Learn about enterprise')">Learn about enterprise</span>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-      </a>
-    </div>
-    <div class="hidden lg:block">
-      <div class="aspect-square rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-200 dark:border-purple-800 flex items-center justify-center">
-        <div class="text-center p-12">
-          <div class="text-6xl mb-4">🎵</div>
-          <p class="text-lg font-semibold text-purple-700 dark:text-purple-300" x-text="t('AI Music Studio')">AI Music Studio</p>
-          <p class="text-sm text-gray-600 dark:text-gray-400 mt-2" x-text="t('Powered by Avireon')">Powered by Avireon</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── Developer Docs Section ─── -->
-<section class="bg-gray-50 dark:bg-gray-900/50 border-t border-b border-gray-200 dark:border-gray-800">
+<!-- ─── Enterprise Section ─── -->
+<section class="bg-white border-t border-b border-gray-200">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-    <div class="text-center mb-12">
-      <h2 class="text-3xl sm:text-4xl font-bold mb-4" x-text="t('Developer-Friendly API')">Developer-Friendly API</h2>
-      <p class="text-lg text-gray-600 dark:text-gray-400 max-w-xl mx-auto" x-text="t('Integrate AI music generation into your own applications with our REST API.')">Integrate AI music generation into your own applications with our REST API.</p>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-      <div class="text-center p-6">
-        <div class="text-3xl mb-3">🔌</div>
-        <h3 class="font-semibold mb-2" x-text="t('REST API')">REST API</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="t('Simple HTTP endpoints for music generation')">Simple HTTP endpoints for music generation</p>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <div>
+        <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-6" x-text="t('Built for Enterprise Music Production')">{{ _('Built for Enterprise Music Production') }}</h2>
+        <p class="text-lg text-gray-600 mb-8" x-text="t('Avireon provides enterprises with efficient AI-powered music production tools, helping studios, content teams, and businesses achieve high-quality music output at scale.')">
+          {{ _('Avireon provides enterprises with efficient AI-powered music production tools, helping studios, content teams, and businesses achieve high-quality music output at scale.') }}
+        </p>
+        <div class="space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div><p class="font-medium text-gray-900" x-text="t('For Music Studios')">{{ _('For Music Studios') }}</p><p class="text-sm text-gray-500" x-text="t('Batch music generation and efficient production pipeline')">{{ _('Batch music generation and efficient production pipeline') }}</p></div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div><p class="font-medium text-gray-900" x-text="t('For Content Teams')">{{ _('For Content Teams') }}</p><p class="text-sm text-gray-500" x-text="t('Quick music and voiceover generation for videos and podcasts')">{{ _('Quick music and voiceover generation for videos and podcasts') }}</p></div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div><p class="font-medium text-gray-900" x-text="t('For Business')">{{ _('For Business') }}</p><p class="text-sm text-gray-500" x-text="t('Custom solutions, API access, and dedicated enterprise support')">{{ _('Custom solutions, API access, and dedicated enterprise support') }}</p></div>
+          </div>
+        </div>
+        <a href="/enterprise" class="inline-flex items-center gap-2 mt-8 text-blue-600 font-medium hover:text-blue-500 transition">
+          <span x-text="t('Explore enterprise solutions')">{{ _('Explore enterprise solutions') }}</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        </a>
       </div>
-      <div class="text-center p-6">
-        <div class="text-3xl mb-3">📖</div>
-        <h3 class="font-semibold mb-2" x-text="t('Interactive Docs')">Interactive Docs</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="t('Try API calls directly from your browser')">Try API calls directly from your browser</p>
+      <div class="hidden lg:block">
+        <div class="aspect-[4/3] rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 flex items-center justify-center">
+          <div class="text-center p-12">
+            <div class="text-6xl mb-4">🏢</div>
+            <p class="text-lg font-semibold text-blue-800">Avireon</p>
+            <p class="text-sm text-blue-600 mt-2" x-text="t('Enterprise AI Music Platform')">{{ _('Enterprise AI Music Platform') }}</p>
+          </div>
+        </div>
       </div>
-      <div class="text-center p-6">
-        <div class="text-3xl mb-3">🔑</div>
-        <h3 class="font-semibold mb-2" x-text="t('API Keys')">API Keys</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="t('Generate keys for your applications')">Generate keys for your applications</p>
-      </div>
-    </div>
-    <div class="text-center mt-10">
-      <a href="/docs" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-base font-medium text-white bg-gray-900 dark:bg-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 transition">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-        <span x-text="t('Browse API Docs')">Browse API Docs</span>
-      </a>
     </div>
   </div>
 </section>
 
 <!-- ─── CTA Section ─── -->
 <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-  <div class="rounded-3xl bg-gradient-to-br from-purple-600 to-pink-600 p-12 sm:p-16">
-    <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4" x-text="t('Ready to Create Your Next Hit?')">Ready to Create Your Next Hit?</h2>
-    <p class="text-lg text-purple-100 max-w-lg mx-auto mb-8" x-text="t('Start generating music with AI today. No credit card required.')">Start generating music with AI today. No credit card required.</p>
-    <a href="/create" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-base font-semibold text-purple-700 bg-white hover:bg-gray-100 transition shadow-lg">
-      <span x-text="t('Get Started Free')">Get Started Free</span>
+  <div class="rounded-xl bg-blue-600 p-12 sm:p-16">
+    <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4" x-text="t('Ready to Transform Your Music Workflow?')">{{ _('Ready to Transform Your Music Workflow?') }}</h2>
+    <p class="text-lg text-blue-100 max-w-lg mx-auto mb-8" x-text="t('Start creating with AI today. No credit card required.')">{{ _('Start creating with AI today. No credit card required.') }}</p>
+    <a href="/create" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg text-base font-semibold text-blue-700 bg-white hover:bg-gray-100 transition shadow-lg">
+      <span x-text="t('Get Started Free')">{{ _('Get Started Free') }}</span>
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
     </a>
   </div>
 </section>
-{% endblock %}
-
-{% block scripts %}
-<script>
-  document.addEventListener('alpine:init', () => {
-    if (!Alpine.store('app')) {
-      Alpine.store('app', Alpine.reactive({
-        lang: localStorage.getItem('lang') || '{{ current_locale }}',
-        t(key) {
-          const dict = window.TRANSLATIONS && window.TRANSLATIONS[this.lang];
-          return dict && dict[key] ? dict[key] : key;
-        }
-      }));
-    }
-  });
-</script>
 {% endblock %}

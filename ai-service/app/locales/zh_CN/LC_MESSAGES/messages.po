@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-07-25 16:51-0300\n"
+"POT-Creation-Date: 2026-07-26 09:49-0300\n"
 "PO-Revision-Date: 2026-07-25 16:50-0300\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: zh_Hans_CN\n"
@@ -18,41 +18,114 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: app/templates/base.html:7
-msgid "AI music creation platform"
-msgstr "AI 音乐创作平台"
+#: app/templates/components/footer.html:6
+msgid "Product"
+msgstr "产品"
 
-#: app/templates/base.html:19 app/templates/base.html:46
-#: app/templates/pages/home.html:43
-msgid "Create"
-msgstr "创作"
+#: app/templates/components/footer.html:8 app/templates/pages/home.html:62
+msgid "AI Music Generation"
+msgstr "AI 音乐生成"
 
-#: app/templates/base.html:20 app/templates/base.html:47
-#: app/templates/base.html:63 app/templates/pages/explore.html:4
-msgid "Explore"
-msgstr "探索"
+#: app/templates/components/footer.html:9
+msgid "Lyrics Generator"
+msgstr "歌词生成器"
 
-#: app/templates/base.html:21 app/templates/base.html:48
-msgid "Library"
-msgstr "我的作品"
+#: app/templates/components/footer.html:10
+#, fuzzy
+msgid "Text to Speech"
+msgstr "文本转语音"
 
-#: app/templates/base.html:22 app/templates/base.html:49
-#: app/templates/base.html:64
-msgid "Templates"
-msgstr "模板库"
+#: app/templates/components/footer.html:11
+msgid "MV Templates"
+msgstr "MV 模板"
 
-#: app/templates/base.html:41
+#: app/templates/components/footer.html:16
+msgid "Documentation"
+msgstr "文档"
+
+#: app/templates/components/footer.html:18
+msgid "Quick Start"
+msgstr "快速开始"
+
+#: app/templates/components/footer.html:19
+msgid "API Reference"
+msgstr "API 参考"
+
+#: app/templates/components/footer.html:20
+msgid "Integration Guide"
+msgstr "集成指南"
+
+#: app/templates/components/footer.html:25
+#: app/templates/components/navbar.html:10
+#: app/templates/components/navbar.html:62
+msgid "Pricing"
+msgstr "定价"
+
+#: app/templates/components/footer.html:27
+#, fuzzy
+msgid "Starter"
+msgstr "分享"
+
+#: app/templates/components/footer.html:28
+#, fuzzy
+msgid "Professional"
+msgstr "专业音乐"
+
+#: app/templates/components/footer.html:29
+msgid "Enterprise"
+msgstr "企业版"
+
+#: app/templates/components/footer.html:34
+msgid "Contact"
+msgstr "联系我们"
+
+#: app/templates/components/footer.html:36
+#: app/templates/components/footer.html:49
+msgid "Contact Us"
+msgstr "联系我们"
+
+#: app/templates/components/footer.html:37
+msgid "About"
+msgstr "关于我们"
+
+#: app/templates/components/footer.html:47
+msgid "Privacy Policy"
+msgstr "隐私政策"
+
+#: app/templates/components/footer.html:48
+msgid "Terms of Service"
+msgstr "服务条款"
+
+#: app/templates/components/navbar.html:8
+#: app/templates/components/navbar.html:60
+msgid "Products"
+msgstr "产品"
+
+#: app/templates/components/navbar.html:9
+#: app/templates/components/navbar.html:61
+msgid "Solutions"
+msgstr "解决方案"
+
+#: app/templates/components/navbar.html:11
+#: app/templates/components/navbar.html:63
+#, fuzzy
+msgid "Developer Docs"
+msgstr "开发者文档"
+
+#: app/templates/components/navbar.html:38
+#: app/templates/components/navbar.html:66 app/templates/pages/console.html:6
+msgid "Console"
+msgstr "控制台"
+
+#: app/templates/components/navbar.html:45
+#: app/templates/components/navbar.html:70
 msgid "Sign In"
 msgstr "登录"
 
-#: app/templates/base.html:42
-msgid "Sign Up"
-msgstr "注册"
-
-#: app/templates/base.html:65 app/templates/pages/settings.html:2
-#: app/templates/pages/settings.html:11
-msgid "Settings"
-msgstr "设置"
+#: app/templates/components/navbar.html:46
+#: app/templates/components/navbar.html:71
+msgid "Get Started"
+msgstr "开始使用"
 
 #: app/templates/pages/admin.html:2
 msgid "Admin — Avireon"
@@ -94,93 +167,281 @@ msgstr "用户管理"
 msgid "Jobs"
 msgstr "任务管理"
 
-#: app/templates/pages/admin.html:36
+#: app/templates/pages/admin.html:32
+msgid "Templates"
+msgstr "模板库"
+
+#: app/templates/pages/admin.html:38
 msgid "Search users..."
 msgstr "搜索用户..."
 
-#: app/templates/pages/admin.html:43
+#: app/templates/pages/admin.html:45
 msgid "User"
 msgstr "用户"
 
-#: app/templates/pages/admin.html:44 app/templates/pages/settings.html:18
+#: app/templates/pages/admin.html:46 app/templates/pages/settings.html:18
 msgid "Email"
 msgstr "邮箱"
 
-#: app/templates/pages/admin.html:45
+#: app/templates/pages/admin.html:47
 msgid "Credits"
 msgstr ""
 
-#: app/templates/pages/admin.html:46 app/templates/pages/admin.html:89
+#: app/templates/pages/admin.html:48 app/templates/pages/admin.html:92
+#: app/templates/pages/admin.html:142
 msgid "Created"
 msgstr "创建时间"
 
-#: app/templates/pages/admin.html:47 app/templates/pages/admin.html:90
+#: app/templates/pages/admin.html:49 app/templates/pages/admin.html:93
+#: app/templates/pages/admin.html:143
 msgid "Actions"
 msgstr "操作"
 
-#: app/templates/pages/admin.html:60
+#: app/templates/pages/admin.html:62
 msgid "+Credits"
 msgstr ""
 
-#: app/templates/pages/admin.html:61
+#: app/templates/pages/admin.html:63
 msgid "-Credits"
 msgstr ""
 
-#: app/templates/pages/admin.html:62 app/templates/pages/library.html:68
+#: app/templates/pages/admin.html:64 app/templates/pages/admin.html:172
+#: app/templates/pages/library.html:68
 msgid "Delete"
 msgstr "删除"
 
-#: app/templates/pages/admin.html:74
+#: app/templates/pages/admin.html:77
 msgid "All Status"
 msgstr "全部状态"
 
-#: app/templates/pages/admin.html:75
+#: app/templates/pages/admin.html:78
 msgid "Pending"
 msgstr "待处理"
 
-#: app/templates/pages/admin.html:76
+#: app/templates/pages/admin.html:79
 msgid "Processing"
 msgstr "处理中"
 
-#: app/templates/pages/admin.html:77
+#: app/templates/pages/admin.html:80
 msgid "Completed"
 msgstr "已完成"
 
-#: app/templates/pages/admin.html:78
+#: app/templates/pages/admin.html:81
 msgid "Failed"
 msgstr "失败"
 
-#: app/templates/pages/admin.html:85
+#: app/templates/pages/admin.html:88
 msgid "Job ID"
 msgstr "任务 ID"
 
-#: app/templates/pages/admin.html:86
+#: app/templates/pages/admin.html:89
 msgid "Type"
 msgstr "类型"
 
-#: app/templates/pages/admin.html:87
+#: app/templates/pages/admin.html:90 app/templates/pages/admin.html:141
 msgid "Status"
 msgstr "状态"
 
-#: app/templates/pages/admin.html:88
+#: app/templates/pages/admin.html:91
 msgid "Progress"
 msgstr "进度"
 
-#: app/templates/pages/admin.html:110
+#: app/templates/pages/admin.html:113
 msgid "Retry"
 msgstr "重试"
 
-#: app/templates/pages/admin.html:163
+#: app/templates/pages/admin.html:126
+msgid "Show inactive only"
+msgstr "仅显示已禁用"
+
+#: app/templates/pages/admin.html:130 app/templates/pages/admin.html:188
+msgid "New Template"
+msgstr "新建模板"
+
+#: app/templates/pages/admin.html:138
+msgid "Name"
+msgstr "名称"
+
+#: app/templates/pages/admin.html:139 app/templates/pages/admin.html:198
+msgid "Style Tags"
+msgstr "风格标签"
+
+#: app/templates/pages/admin.html:140
+msgid "Cover"
+msgstr "封面"
+
+#: app/templates/pages/admin.html:160
+msgid "none"
+msgstr "无"
+
+#: app/templates/pages/admin.html:165
+msgid "Active"
+msgstr "已启用"
+
+#: app/templates/pages/admin.html:165
+msgid "Inactive"
+msgstr "已禁用"
+
+#: app/templates/pages/admin.html:169 app/templates/pages/library.html:66
+msgid "Edit"
+msgstr "编辑"
+
+#: app/templates/pages/admin.html:170
+msgid "Approve"
+msgstr "通过"
+
+#: app/templates/pages/admin.html:171
+msgid "Reject"
+msgstr "驳回"
+
+#: app/templates/pages/admin.html:177
+msgid "No templates found"
+msgstr "未找到模板"
+
+#: app/templates/pages/admin.html:188
+msgid "Edit Template"
+msgstr "编辑模板"
+
+#: app/templates/pages/admin.html:194
+msgid "Template Name"
+msgstr "模板名称"
+
+#: app/templates/pages/admin.html:199
+#, fuzzy
+msgid "e.g. 古风,国风,民乐"
+msgstr "例如：古风、流行、电子"
+
+#: app/templates/pages/admin.html:202
+msgid "Cover Image URL"
+msgstr "封面图片链接"
+
+#: app/templates/pages/admin.html:207 app/templates/pages/templates.html:84
+msgid "Lyric Template"
+msgstr "歌词模板"
+
+#: app/templates/pages/admin.html:211 app/templates/pages/templates.html:88
+msgid "Music Prompt"
+msgstr "音乐提示词"
+
+#: app/templates/pages/admin.html:215 app/templates/pages/templates.html:92
+msgid "MV Scene Prompt"
+msgstr "MV 场景提示词"
+
+#: app/templates/pages/admin.html:222
+msgid "Cancel"
+msgstr "取消"
+
+#: app/templates/pages/admin.html:227
+msgid "Saving..."
+msgstr "保存中..."
+
+#: app/templates/pages/admin.html:227
+msgid "Save"
+msgstr "保存"
+
+#: app/templates/pages/admin.html:302
 msgid "How many credits to add?"
 msgstr ""
 
-#: app/templates/pages/admin.html:174
+#: app/templates/pages/admin.html:313
 msgid "How many credits to remove?"
 msgstr ""
 
-#: app/templates/pages/admin.html:185
+#: app/templates/pages/admin.html:324
 msgid "Delete this user? This cannot be undone."
 msgstr "确认删除此用户？此操作不可撤销。"
+
+#: app/templates/pages/admin.html:385
+msgid "Delete this template?"
+msgstr "确认删除此模板？"
+
+#: app/templates/pages/console.html:51
+#, fuzzy
+msgid "Production Console"
+msgstr "制作控制台"
+
+#: app/templates/pages/console.html:56
+#, fuzzy
+msgid "Music Generation"
+msgstr "音乐生成"
+
+#: app/templates/pages/console.html:60 app/templates/pages/home.html:68
+#, fuzzy
+msgid "Lyrics Creation"
+msgstr "歌词创作"
+
+#: app/templates/pages/console.html:64 app/templates/pages/home.html:74
+msgid "Voice Synthesis"
+msgstr "语音合成"
+
+#: app/templates/pages/console.html:68
+#, fuzzy
+msgid "MV Production"
+msgstr "MV 制作"
+
+#: app/templates/pages/console.html:75
+msgid "Task Records"
+msgstr "任务记录"
+
+#: app/templates/pages/console.html:79
+#, fuzzy
+msgid "Account Settings"
+msgstr "账户设置"
+
+#: app/templates/pages/console.html:87
+#, fuzzy
+msgid "Sign Out"
+msgstr "退出登录"
+
+#: app/templates/pages/console.html:114
+msgid "Back to Website"
+msgstr "返回官网"
+
+#: app/templates/pages/console.html:124
+#, fuzzy
+msgid "Today's Generations"
+msgstr "今日生成次数"
+
+#: app/templates/pages/console.html:128
+#, fuzzy
+msgid "Total Works"
+msgstr "作品总数"
+
+#: app/templates/pages/console.html:132
+msgid "MV Quota"
+msgstr "MV 配额"
+
+#: app/templates/pages/console.html:135
+#, fuzzy
+msgid "Free"
+msgstr "免费"
+
+#: app/templates/pages/console.html:136
+msgid "Current Plan"
+msgstr "当前套餐"
+
+#: app/templates/pages/console.html:142
+#, fuzzy
+msgid "Quick Actions"
+msgstr "快捷操作"
+
+#: app/templates/pages/console.html:148
+#, fuzzy
+msgid "New Music Generation"
+msgstr "新建音乐生成"
+
+#: app/templates/pages/console.html:149
+msgid "Create a new song with AI"
+msgstr "用 AI 创作新歌曲"
+
+#: app/templates/pages/console.html:155
+msgid "My Works"
+msgstr "我的作品"
+
+#: app/templates/pages/console.html:156
+#, fuzzy
+msgid "Browse your creations"
+msgstr "浏览你的作品"
 
 #: app/templates/pages/create.html:2
 msgid "Create — Avireon"
@@ -202,217 +463,217 @@ msgstr ""
 msgid "知道了"
 msgstr ""
 
-#: app/templates/pages/create.html:52
+#: app/templates/pages/create.html:53
 msgid "What do you want to create?"
 msgstr "你想创作什么？"
 
-#: app/templates/pages/create.html:53
+#: app/templates/pages/create.html:54
 msgid ""
 "Describe the song you want... e.g. 'A sad song about leaving home, "
 "cinematic feel'"
 msgstr ""
 
-#: app/templates/pages/create.html:58
+#: app/templates/pages/create.html:59
 msgid "Song Language"
 msgstr "歌曲语言"
 
-#: app/templates/pages/create.html:60 app/templates/pages/settings.html:53
+#: app/templates/pages/create.html:61 app/templates/pages/settings.html:53
 msgid "Auto Detect"
 msgstr "自动检测"
 
-#: app/templates/pages/create.html:61 app/templates/pages/settings.html:54
+#: app/templates/pages/create.html:62 app/templates/pages/settings.html:54
 msgid "中文"
 msgstr ""
 
-#: app/templates/pages/create.html:62 app/templates/pages/settings.html:40
+#: app/templates/pages/create.html:63 app/templates/pages/settings.html:40
 #: app/templates/pages/settings.html:55
 msgid "English"
 msgstr "英语"
 
-#: app/templates/pages/create.html:63 app/templates/pages/settings.html:56
+#: app/templates/pages/create.html:64 app/templates/pages/settings.html:56
 msgid "日本語"
 msgstr ""
 
-#: app/templates/pages/create.html:64 app/templates/pages/settings.html:57
+#: app/templates/pages/create.html:65 app/templates/pages/settings.html:57
 msgid "한국어"
 msgstr ""
 
-#: app/templates/pages/create.html:68 app/templates/pages/create.html:148
+#: app/templates/pages/create.html:69 app/templates/pages/create.html:149
 msgid "Genre"
 msgstr "曲风"
 
-#: app/templates/pages/create.html:70 app/templates/pages/create.html:150
+#: app/templates/pages/create.html:71 app/templates/pages/create.html:151
 #: app/templates/pages/settings.html:63
 msgid "Pop"
 msgstr "流行"
 
-#: app/templates/pages/create.html:71 app/templates/pages/create.html:151
+#: app/templates/pages/create.html:72 app/templates/pages/create.html:152
 #: app/templates/pages/settings.html:64
 msgid "Rock"
 msgstr "摇滚"
 
-#: app/templates/pages/create.html:72 app/templates/pages/create.html:152
+#: app/templates/pages/create.html:73 app/templates/pages/create.html:153
 #: app/templates/pages/settings.html:65
 msgid "Electronic"
 msgstr "电子"
 
-#: app/templates/pages/create.html:73 app/templates/pages/create.html:153
+#: app/templates/pages/create.html:74 app/templates/pages/create.html:154
 #: app/templates/pages/settings.html:66
 msgid "Hip Hop"
 msgstr "嘻哈"
 
-#: app/templates/pages/create.html:74 app/templates/pages/create.html:154
+#: app/templates/pages/create.html:75 app/templates/pages/create.html:155
 #: app/templates/pages/settings.html:67
 msgid "R&B"
 msgstr "节奏蓝调"
 
-#: app/templates/pages/create.html:75
+#: app/templates/pages/create.html:76
 msgid "Jazz"
 msgstr "爵士"
 
-#: app/templates/pages/create.html:76
+#: app/templates/pages/create.html:77
 msgid "Classical"
 msgstr "古典"
 
-#: app/templates/pages/create.html:77 app/templates/pages/create.html:155
+#: app/templates/pages/create.html:78 app/templates/pages/create.html:156
 #: app/templates/pages/settings.html:68
 msgid "Folk"
 msgstr "民谣"
 
-#: app/templates/pages/create.html:81
+#: app/templates/pages/create.html:82
 msgid "Mood"
 msgstr ""
 
-#: app/templates/pages/create.html:83
+#: app/templates/pages/create.html:84
 msgid "Any"
 msgstr ""
 
-#: app/templates/pages/create.html:84
+#: app/templates/pages/create.html:85
 msgid "Happy"
 msgstr ""
 
-#: app/templates/pages/create.html:85
+#: app/templates/pages/create.html:86
 msgid "Sad"
 msgstr ""
 
-#: app/templates/pages/create.html:86
+#: app/templates/pages/create.html:87
 msgid "Energetic"
 msgstr ""
 
-#: app/templates/pages/create.html:87
+#: app/templates/pages/create.html:88
 msgid "Calm"
 msgstr ""
 
-#: app/templates/pages/create.html:88
+#: app/templates/pages/create.html:89
 msgid "Dark"
 msgstr ""
 
-#: app/templates/pages/create.html:89
+#: app/templates/pages/create.html:90
 msgid "Romantic"
 msgstr ""
 
-#: app/templates/pages/create.html:93
+#: app/templates/pages/create.html:94
 msgid "Vocal"
 msgstr ""
 
-#: app/templates/pages/create.html:95 app/templates/pages/settings.html:74
+#: app/templates/pages/create.html:96 app/templates/pages/settings.html:74
 msgid "Auto"
 msgstr "自动"
 
-#: app/templates/pages/create.html:96 app/templates/pages/settings.html:75
+#: app/templates/pages/create.html:97 app/templates/pages/settings.html:75
 msgid "Male"
 msgstr "男声"
 
-#: app/templates/pages/create.html:97 app/templates/pages/settings.html:76
+#: app/templates/pages/create.html:98 app/templates/pages/settings.html:76
 msgid "Female"
 msgstr "女声"
 
-#: app/templates/pages/create.html:112 app/templates/pages/creation.html:100
-#: app/templates/pages/home.html:114 app/templates/pages/share-event.html:68
+#: app/templates/pages/create.html:113 app/templates/pages/creation.html:108
+#: app/templates/pages/share-event.html:68
 msgid "Lyrics"
 msgstr "歌词"
 
-#: app/templates/pages/create.html:124
+#: app/templates/pages/create.html:125
 msgid "Title"
 msgstr ""
 
-#: app/templates/pages/create.html:134
+#: app/templates/pages/create.html:135
 msgid "Regenerate"
 msgstr ""
 
-#: app/templates/pages/create.html:137
+#: app/templates/pages/create.html:138
 msgid "Continue"
 msgstr ""
 
-#: app/templates/pages/create.html:144
+#: app/templates/pages/create.html:145
 msgid "Music Settings"
 msgstr ""
 
-#: app/templates/pages/create.html:159
+#: app/templates/pages/create.html:160
 msgid "Versions"
 msgstr ""
 
-#: app/templates/pages/create.html:161
+#: app/templates/pages/create.html:162
 msgid "1 Version"
 msgstr ""
 
-#: app/templates/pages/create.html:162
+#: app/templates/pages/create.html:163
 msgid "2 Versions"
 msgstr ""
 
-#: app/templates/pages/create.html:179
+#: app/templates/pages/create.html:180
 msgid "Analyzing lyrics"
 msgstr ""
 
-#: app/templates/pages/create.html:183
+#: app/templates/pages/create.html:184
 msgid "Creating composition"
 msgstr ""
 
-#: app/templates/pages/create.html:187
+#: app/templates/pages/create.html:188
 msgid "Generating vocals"
 msgstr ""
 
-#: app/templates/pages/create.html:191
+#: app/templates/pages/create.html:192
 msgid "Finalizing audio"
 msgstr ""
 
-#: app/templates/pages/create.html:201
+#: app/templates/pages/create.html:202
 msgid "Generated Versions"
 msgstr ""
 
-#: app/templates/pages/create.html:212
+#: app/templates/pages/create.html:213
 msgid "Selected"
 msgstr ""
 
-#: app/templates/pages/create.html:216
+#: app/templates/pages/create.html:217
 msgid "Continue to Visuals"
 msgstr ""
 
-#: app/templates/pages/create.html:223
+#: app/templates/pages/create.html:224
 msgid "Visuals"
 msgstr ""
 
-#: app/templates/pages/create.html:227 app/templates/pages/creation.html:107
+#: app/templates/pages/create.html:228 app/templates/pages/creation.html:115
 msgid "Cover Art"
 msgstr "封面"
 
-#: app/templates/pages/create.html:246 app/templates/pages/creation.html:92
+#: app/templates/pages/create.html:247 app/templates/pages/creation.html:100
 msgid "Music Video"
 msgstr "MV 视频"
 
-#: app/templates/pages/create.html:282
+#: app/templates/pages/create.html:283
 msgid "Describe your song to get started"
 msgstr ""
 
-#: app/templates/pages/create.html:283
+#: app/templates/pages/create.html:284
 msgid "The preview will appear here"
 msgstr ""
 
-#: app/templates/pages/create.html:315
+#: app/templates/pages/create.html:316
 msgid "Generate visuals to preview"
 msgstr ""
 
-#: app/templates/pages/create.html:319
+#: app/templates/pages/create.html:320
 msgid "Ready to publish your creation"
 msgstr ""
 
@@ -420,7 +681,6 @@ msgstr ""
 #: app/templates/pages/creation.html:30 app/templates/pages/share-event.html:3
 #: app/templates/pages/share-event.html:8
 #: app/templates/pages/share-event.html:38
-#: app/templates/pages/templates.html:43
 msgid "Untitled"
 msgstr "未命名"
 
@@ -441,57 +701,69 @@ msgstr "分享"
 msgid "Download"
 msgstr "下载"
 
-#: app/templates/pages/creation.html:84
+#: app/templates/pages/creation.html:63
+msgid "Remix"
+msgstr ""
+
+#: app/templates/pages/creation.html:67
+msgid "Save as Template"
+msgstr "保存为模板"
+
+#: app/templates/pages/creation.html:92
 msgid "Audio"
 msgstr "音频"
 
-#: app/templates/pages/creation.html:88
+#: app/templates/pages/creation.html:96
 msgid "No audio available"
 msgstr "暂无音频"
 
-#: app/templates/pages/creation.html:96
+#: app/templates/pages/creation.html:104
 msgid "No music video yet"
 msgstr ""
 
-#: app/templates/pages/creation.html:102
+#: app/templates/pages/creation.html:110
 msgid "No lyrics available"
 msgstr "暂无歌词"
 
-#: app/templates/pages/creation.html:113
+#: app/templates/pages/creation.html:121
 msgid "No cover art"
 msgstr "暂无封面"
 
-#: app/templates/pages/creation.html:120
+#: app/templates/pages/creation.html:128
 msgid "Created with Avireon"
 msgstr ""
 
-#: app/templates/pages/creation.html:123
+#: app/templates/pages/creation.html:131
 msgid "Create Your Own"
 msgstr ""
 
-#: app/templates/pages/creation.html:131
+#: app/templates/pages/creation.html:139
 msgid "Task Status"
 msgstr "任务状态"
 
-#: app/templates/pages/creation.html:132
+#: app/templates/pages/creation.html:140
 msgid "Loading..."
 msgstr "加载中..."
 
-#: app/templates/pages/creation.html:133
+#: app/templates/pages/creation.html:141
 msgid "No tasks found"
 msgstr "暂无任务"
 
-#: app/templates/pages/creation.html:171
+#: app/templates/pages/creation.html:179
 msgid "Share your creation"
 msgstr "分享你的作品"
 
-#: app/templates/pages/creation.html:178
+#: app/templates/pages/creation.html:186
 msgid "Share to:"
 msgstr "分享到："
 
-#: app/templates/pages/creation.html:185
+#: app/templates/pages/creation.html:193
 msgid "Close"
 msgstr "关闭"
+
+#: app/templates/pages/explore.html:4
+msgid "Explore"
+msgstr "探索"
 
 #: app/templates/pages/explore.html:11
 msgid "Search songs..."
@@ -505,180 +777,160 @@ msgstr "暂无作品"
 msgid "Be the first to create →"
 msgstr ""
 
-#: app/templates/pages/explore.html:44 app/templates/pages/templates.html:39
+#: app/templates/pages/explore.html:44
 msgid "MV"
 msgstr "MV"
 
 #: app/templates/pages/explore.html:79 app/templates/pages/library.html:77
-#: app/templates/pages/templates.html:55
+#: app/templates/pages/templates.html:65
 msgid "Load More"
 msgstr "加载更多"
 
-#: app/templates/pages/explore.html:157
-msgid "🎵 作品广场"
-msgstr ""
-
-#: app/templates/pages/explore.html:158
-msgid "探索社区 AI 创作的优秀作品"
-msgstr ""
-
-#: app/templates/pages/explore.html:161
-msgid "+ 新建作品"
-msgstr ""
-
-#: app/templates/pages/explore.html:172
-msgid "搜索作品标题、描述、风格..."
-msgstr ""
-
-#: app/templates/pages/explore.html:177
-msgid "最新发布"
-msgstr ""
-
-#: app/templates/pages/explore.html:178
-msgid "最多播放"
-msgstr ""
-
-#: app/templates/pages/explore.html:185
-msgid "加载作品中..."
-msgstr ""
-
-#: app/templates/pages/explore.html:191
-msgid "还没有公开作品"
-msgstr ""
-
-#: app/templates/pages/explore.html:192
-msgid "去创作第一首歌曲"
-msgstr ""
-
-#: app/templates/pages/explore.html:209
-msgid "含 MV"
-msgstr ""
-
-#: app/templates/pages/explore.html:223
-msgid "播放"
-msgstr ""
-
-#: app/templates/pages/explore.html:225
-msgid "分享"
-msgstr ""
-
-#: app/templates/pages/explore.html:237
-msgid "加载更多"
-msgstr ""
-
-#: app/templates/pages/explore.html:313
-msgid "分享链接已复制到剪贴板！"
-msgstr ""
-
-#: app/templates/pages/explore.html:315
-msgid "复制以下链接分享："
-msgstr ""
-
 #: app/templates/pages/home.html:2
-msgid "Avireon — Turn Your Idea Into Music"
-msgstr ""
+#, fuzzy
+msgid "AI-Powered Music Creation Platform for Enterprise"
+msgstr "Avireon — 企业级 AI 音乐创作平台"
 
 #: app/templates/pages/home.html:3
 msgid ""
-"AI music creation platform. Describe your song, generate lyrics, music, "
-"and music video in minutes."
+"Avireon is an AI-powered music creation platform for enterprises. "
+"Generate original music, lyrics, voiceovers, and music videos — all "
+"through an automated enterprise workflow."
 msgstr ""
 
-#: app/templates/pages/home.html:21
-msgid "Turn your idea"
-msgstr "把你的灵感"
+#: app/templates/pages/home.html:24
+#, fuzzy
+msgid "AI-Powered One-Stop Music Creation Platform"
+msgstr "AI 音乐创作平台"
 
-#: app/templates/pages/home.html:22
-msgid "into music"
-msgstr "变成音乐"
-
-#: app/templates/pages/home.html:25
+#: app/templates/pages/home.html:27
 msgid ""
-"Describe the song you want. AI generates lyrics, music, and a music video"
-" — all in one click."
+"Enable music generation, lyric creation, voice processing, and audio "
+"post-production to enter enterprise-grade workflows — efficiently, at "
+"scale, with AI."
 msgstr ""
+
+#: app/templates/pages/home.html:32
+#, fuzzy
+msgid "Try Music Generation Free"
+msgstr "免费体验生成音乐"
 
 #: app/templates/pages/home.html:35
-msgid "A sad song about leaving home, cinematic, male vocal..."
-msgstr ""
+msgid "View Enterprise Plan"
+msgstr "查看企业方案"
+
+#: app/templates/pages/home.html:42
+msgid "No credit card required"
+msgstr "无需信用卡"
 
 #: app/templates/pages/home.html:46
-msgid "Try: \"A happy pop song about summer vacation\" or \"一首关于失恋的悲伤民谣\""
-msgstr ""
-
-#: app/templates/pages/home.html:54
-msgid "Featured Creations"
-msgstr ""
+msgid "Daily free quota included"
+msgstr "包含每日免费额度"
 
 #: app/templates/pages/home.html:55
-msgid "View All"
-msgstr ""
+msgid "Core Capabilities"
+msgstr "核心能力"
+
+#: app/templates/pages/home.html:56
+#, fuzzy
+msgid ""
+"Four core AI-powered tools available now. Professional production tools "
+"coming in subsequent phases."
+msgstr "核心功能现已公测开放，专业工具即将推出。"
 
 #: app/templates/pages/home.html:63
-msgid "No creations yet. Be the first to create something amazing!"
+#, fuzzy
+msgid "Describe your song. AI generates complete music with vocals in minutes."
+msgstr "用文字描述你的歌曲，AI 在几分钟内生成带人声的完整音乐。"
+
+#: app/templates/pages/home.html:69
+msgid ""
+"AI writes lyrics in any style and language. Generate verses, chorus, and "
+"LRC format."
+msgstr "AI 支持多风格多语言歌词创作，自动生成主歌、副歌及 LRC 歌词格式。"
+
+#: app/templates/pages/home.html:75
+#, fuzzy
+msgid ""
+"Convert text to natural speech. Multiple voice options and languages "
+"supported."
+msgstr "将文本转为自然人声，支持多种音色和语言。"
+
+#: app/templates/pages/home.html:80
+#, fuzzy
+msgid "MV Generation"
+msgstr "MV 生成"
+
+#: app/templates/pages/home.html:81
+#, fuzzy
+msgid ""
+"Auto-generate music videos from your songs. Multiple visual styles "
+"available."
+msgstr "从你的歌曲自动生成 MV，支持多种视觉风格和模板。"
+
+#: app/templates/pages/home.html:91
+#, fuzzy
+msgid "Built for Enterprise Music Production"
+msgstr "为音乐专业人士打造"
+
+#: app/templates/pages/home.html:93
+msgid ""
+"Avireon provides enterprises with efficient AI-powered music production "
+"tools, helping studios, content teams, and businesses achieve high-"
+"quality music output at scale."
 msgstr ""
 
-#: app/templates/pages/home.html:101
-msgid "How It Works"
-msgstr ""
+#: app/templates/pages/home.html:100
+msgid "For Music Studios"
+msgstr "音乐工作室"
 
-#: app/templates/pages/home.html:107
-msgid "Describe"
-msgstr "描述"
+#: app/templates/pages/home.html:100
+msgid "Batch music generation and efficient production pipeline"
+msgstr "批量音乐生成与高效制作流水线"
 
-#: app/templates/pages/home.html:108
-msgid "Tell us what song you want in one sentence"
-msgstr ""
+#: app/templates/pages/home.html:106
+#, fuzzy
+msgid "For Content Teams"
+msgstr "内容创作者"
 
-#: app/templates/pages/home.html:115
-msgid "AI generates lyrics, you can edit them"
-msgstr ""
+#: app/templates/pages/home.html:106
+#, fuzzy
+msgid "Quick music and voiceover generation for videos and podcasts"
+msgstr "为视频、播客和直播快速生成音乐"
 
-#: app/templates/pages/home.html:121
-msgid "Music"
-msgstr ""
+#: app/templates/pages/home.html:112
+msgid "For Business"
+msgstr "企业用户"
 
-#: app/templates/pages/home.html:122
-msgid "AI creates the song with vocals"
-msgstr ""
+#: app/templates/pages/home.html:112
+#, fuzzy
+msgid "Custom solutions, API access, and dedicated enterprise support"
+msgstr "自定义品牌、API 接入、专属支持"
 
-#: app/templates/pages/home.html:128
-msgid "Video"
-msgstr ""
+#: app/templates/pages/home.html:116
+#, fuzzy
+msgid "Explore enterprise solutions"
+msgstr "查看企业方案"
 
-#: app/templates/pages/home.html:129
-msgid "Generate a music video automatically"
-msgstr ""
+#: app/templates/pages/home.html:125
+#, fuzzy
+msgid "Enterprise AI Music Platform"
+msgstr "AI 音乐创作平台"
 
-#: app/templates/pages/home.html:138
-msgid "Discover Music"
-msgstr ""
+#: app/templates/pages/home.html:136
+msgid "Ready to Transform Your Music Workflow?"
+msgstr "准备好革新你的音乐工作流程了吗？"
+
+#: app/templates/pages/home.html:137
+#, fuzzy
+msgid "Start creating with AI today. No credit card required."
+msgstr "今天就开始用 AI 创作音乐，无需信用卡。"
 
 #: app/templates/pages/home.html:139
-msgid "AI-powered music creation and exploration"
-msgstr ""
+msgid "Get Started Free"
+msgstr "免费开始使用"
 
-#: app/templates/pages/home.html:146
-msgid "Search tracks..."
-msgstr ""
-
-#: app/templates/pages/home.html:153
-msgid "Searching..."
-msgstr ""
-
-#: app/templates/pages/home.html:162
-msgid "Create Your Own Music with AI"
-msgstr ""
-
-#: app/templates/pages/home.html:163
-msgid "Generate original songs, clone voices, or remix tracks"
-msgstr ""
-
-#: app/templates/pages/home.html:165
-msgid "Try AI Studio"
-msgstr ""
-
-#: app/templates/pages/library.html:5 app/templates/pages/library.html:156
+#: app/templates/pages/library.html:5
 msgid "My Library"
 msgstr "我的作品库"
 
@@ -694,10 +946,6 @@ msgstr ""
 msgid "Draft"
 msgstr "草稿"
 
-#: app/templates/pages/library.html:66
-msgid "Edit"
-msgstr "编辑"
-
 #: app/templates/pages/library.html:126
 msgid "Link copied!"
 msgstr "链接已复制！"
@@ -706,9 +954,9 @@ msgstr "链接已复制！"
 msgid "Delete this creation?"
 msgstr "确认删除此作品？"
 
-#: app/templates/pages/library.html:157
-msgid "Sign in to see your playlists and favorites."
-msgstr ""
+#: app/templates/pages/settings.html:2 app/templates/pages/settings.html:11
+msgid "Settings"
+msgstr "设置"
 
 #: app/templates/pages/settings.html:15
 msgid "Account"
@@ -822,7 +1070,6 @@ msgid "🎉 You unlocked a bonus generation for the creator!"
 msgstr ""
 
 #: app/templates/pages/share-event.html:40
-#: app/templates/pages/templates.html:44
 msgid "Anonymous"
 msgstr ""
 
@@ -862,458 +1109,23 @@ msgstr ""
 msgid "Create New"
 msgstr ""
 
-#: app/templates/pages/templates.html:15
+#: app/templates/pages/templates.html:16
 msgid "All"
 msgstr ""
 
-#: app/templates/pages/templates.html:27
+#: app/templates/pages/templates.html:28
 msgid "No templates yet"
 msgstr "暂无模板"
 
-#: app/templates/pages/templates.html:28
-msgid "Be the first to create"
-msgstr "成为第一个创作者"
-
-#: app/templates/pages/templates.html:47
-msgid "Remix"
-msgstr ""
-
-#: app/templates/
-msgid "10 free generations daily"
-msgstr "每日 10 次免费生成"
-
-#: app/templates/
-msgid "AI Music Generation"
-msgstr "AI 音乐生成"
-
-#: app/templates/
-msgid "AI Music Platform v2.0 — Now in Public Beta"
-msgstr "AI 音乐平台 v2.0 — 公测中"
-
-#: app/templates/
-msgid "AI Music Studio"
-msgstr "AI 音乐工作室"
-
-#: app/templates/
-msgid "AI writes lyrics in any style and language. Generate verses, chorus, and LRC format."
-msgstr "AI 支持多风格多语言歌词创作，自动生成主歌、副歌及 LRC 歌词格式。"
-
-#: app/templates/
-msgid "AI-powered audio mastering for professional quality"
-msgstr "AI 智能母带处理，打造专业级音质"
-
-#: app/templates/
-msgid "AI-powered music generation, voice cloning, and MV creation — all in one enterprise-grade platform. No studio required."
-msgstr "AI 音乐生成、人声克隆、MV 创作一体化企业级平台，无需专业录音棚。"
-
-#: app/templates/
-msgid "API Docs"
-msgstr "API 文档"
-
-#: app/templates/
-msgid "API Keys"
-msgstr "API 密钥"
-
-#: app/templates/
-msgid "About"
-msgstr "关于我们"
-
-#: app/templates/
-msgid "Active"
-msgstr "已启用"
-
-#: app/templates/
-msgid "Advanced MV"
-msgstr "高级 MV"
-
-#: app/templates/
-msgid "Advanced professional tools for music production — collapsed by default"
-msgstr "专业音乐制作高级工具 — 默认折叠"
-
-#: app/templates/
-msgid "Approve"
-msgstr "通过"
-
-#: app/templates/
-msgid "Auto-generate MV from your song. Choose from multiple visual styles and templates."
-msgstr "从你的歌曲自动生成 MV，支持多种视觉风格和模板。"
-
-#: app/templates/
-msgid "Avireon — AI Music Creation Platform for Enterprise"
-msgstr "Avireon — 企业级 AI 音乐创作平台"
-
-#: app/templates/
-msgid "Blog"
-msgstr "博客"
-
-#: app/templates/
-msgid "Browse API Docs"
-msgstr "浏览 API 文档"
-
-#: app/templates/
-msgid "Built for Music Professionals"
-msgstr "为音乐专业人士打造"
-
-#: app/templates/
-msgid "Bulk generation, voice cloning, mastering pipeline"
-msgstr "批量生成、人声克隆、母带处理流水线"
-
-#: app/templates/
-msgid "Cancel"
-msgstr "取消"
-
-#: app/templates/
-msgid "Clone any voice with a short audio sample"
-msgstr "通过短音频样本克隆任意声音"
-
-#: app/templates/
-msgid "Collaborate with your team in real-time"
-msgstr "与团队成员实时协作"
-
-#: app/templates/
-msgid "Coming Soon"
-msgstr "即将推出"
-
-#: app/templates/
-msgid "Company"
-msgstr "公司"
-
-#: app/templates/
-msgid "Contact"
-msgstr "联系我们"
-
-#: app/templates/
-msgid "Contact Us"
-msgstr "联系我们"
-
-#: app/templates/
-msgid "Convert text to natural vocals. Multiple voice options and languages supported."
-msgstr "将文本转为自然人声，支持多种音色和语言。"
-
-#: app/templates/
-msgid "Core features available now in public beta. Professional tools coming soon."
-msgstr "核心功能现已公测开放，专业工具即将推出。"
-
-#: app/templates/
-msgid "Cover"
-msgstr "封面"
-
-#: app/templates/
-msgid "Cover Image URL"
-msgstr "封面图片链接"
-
-#: app/templates/
-msgid "Custom branding, API access, dedicated support"
-msgstr "自定义品牌、API 接入、专属支持"
-
-#: app/templates/
-msgid "Delete this template?"
-msgstr "确认删除此模板？"
-
-#: app/templates/
-msgid "Describe your song in words. AI generates complete music with vocals in minutes."
-msgstr "用文字描述你的歌曲，AI 在几分钟内生成带人声的完整音乐。"
-
-#: app/templates/
-msgid "Developer-Friendly API"
-msgstr "开发者友好 API"
-
-#: app/templates/
-msgid "Developers"
-msgstr "开发者"
-
-#: app/templates/
-msgid "Docs"
-msgstr "文档"
-
-#: app/templates/
-msgid "Edit Template"
-msgstr "编辑模板"
-
-#: app/templates/
-msgid "Enterprise"
-msgstr "企业版"
-
-#: app/templates/
-msgid "Everything You Need to Create Music"
-msgstr "音乐创作所需的一切"
-
-#: app/templates/
-msgid "For Business"
-msgstr "企业用户"
-
-#: app/templates/
-msgid "For Content Creators"
-msgstr "内容创作者"
-
-#: app/templates/
-msgid "For Creators"
-msgstr "创作者"
-
-#: app/templates/
-msgid "For Music Studios"
-msgstr "音乐工作室"
-
-#: app/templates/
-msgid "For Studios"
-msgstr "工作室"
-
-#: app/templates/
-msgid "Full MV production with AI storyboard + video generation"
-msgstr "AI 分镜 + 视频生成的全流程 MV 制作"
-
-#: app/templates/
-msgid "Full pipeline: lyrics → music → cover → MV in a single click."
-msgstr "一键全链路：歌词 → 音乐 → 封面 → MV"
-
-#: app/templates/
-msgid "Generate Music Free"
-msgstr "免费生成音乐"
-
-#: app/templates/
-msgid "Generate keys for your applications"
-msgstr "为你的应用生成密钥"
-
-#: app/templates/
-msgid "Generate original music, clone voices, create music videos with AI. Enterprise-grade audio platform for studios, creators, and businesses."
-msgstr "AI 生成原创音乐、人声克隆、MV 创作 — 面向工作室、创作者和企业的企业级音频平台。"
-
-#: app/templates/
-msgid "Get Started"
-msgstr "开始使用"
-
-#: app/templates/
-msgid "Get Started Free"
-msgstr "免费开始使用"
-
-#: app/templates/
-msgid "Inactive"
-msgstr "已禁用"
-
-#: app/templates/
-msgid "Integrate AI music generation into your own applications with our REST API."
-msgstr "通过 REST API 将 AI 音乐生成集成到你的应用中。"
-
-#: app/templates/
-msgid "Integration Guide"
-msgstr "集成指南"
-
-#: app/templates/
-msgid "Interactive Docs"
-msgstr "交互式文档"
-
-#: app/templates/
-msgid "Learn about enterprise"
-msgstr "了解企业版"
-
-#: app/templates/
-msgid "Lyric Template"
-msgstr "歌词模板"
-
-#: app/templates/
-msgid "Lyrics Generator"
-msgstr "歌词生成器"
-
-#: app/templates/
-msgid "MV Scene Prompt"
-msgstr "MV 场景提示词"
-
-#: app/templates/
-msgid "MV Templates"
-msgstr "MV 模板"
-
-#: app/templates/
-msgid "Mastering"
-msgstr "母带处理"
-
-#: app/templates/
-msgid "Multi-Collab"
-msgstr "多人协作"
-
-#: app/templates/
-msgid "Music Prompt"
-msgstr "音乐提示词"
-
-#: app/templates/
-msgid "Music Video Templates"
-msgstr "MV 模板"
-
-#: app/templates/
-msgid "Name"
-msgstr "名称"
-
-#: app/templates/
-msgid "New Template"
-msgstr "新建模板"
-
-#: app/templates/
-msgid "No credit card required"
-msgstr "无需信用卡"
-
-#: app/templates/
-msgid "No templates found"
-msgstr "未找到模板"
-
-#: app/templates/
-msgid "One-Click Creation"
-msgstr "一键创作"
-
-#: app/templates/
-msgid "Powered by Avireon"
-msgstr "由 Avireon 提供技术支持"
-
-#: app/templates/
-msgid "Pre-built templates for pop, rock, hip-hop, EDM, lo-fi, and more."
-msgstr "预设流行、摇滚、嘻哈、电子、Lo-Fi 等多种曲风模板。"
-
-#: app/templates/
-msgid "Preview"
-msgstr "预览"
-
-#: app/templates/
-msgid "Pricing"
-msgstr "定价"
-
-#: app/templates/
-msgid "Privacy Policy"
-msgstr "隐私政策"
-
-#: app/templates/
-msgid "Pro Studio"
-msgstr "专业工作室"
-
-#: app/templates/
-msgid "Product"
-msgstr "产品"
-
-#: app/templates/
-msgid "Products"
-msgstr "产品"
-
-#: app/templates/
-msgid "Professional Music"
-msgstr "专业音乐"
-
-#: app/templates/
-msgid "Quick music generation for videos, podcasts, and streams"
-msgstr "为视频、播客和直播快速生成音乐"
-
-#: app/templates/
-msgid "REST API"
-msgstr "REST API"
-
-#: app/templates/
-msgid "Ready to Create Your Next Hit?"
-msgstr "准备好创作下一首热单了吗？"
-
-#: app/templates/
-msgid "Reject"
-msgstr "驳回"
-
-#: app/templates/
-msgid "Remix / Remaster"
-msgstr "Remix / 重制"
-
-#: app/templates/
-msgid "Remix existing tracks with AI-powered tools"
-msgstr "使用 AI 工具对现有曲目进行二创改编"
-
-#: app/templates/
-msgid "Save"
-msgstr "保存"
-
-#: app/templates/
-msgid "Save as Template"
-msgstr "保存为模板"
-
-#: app/templates/
-msgid "Saving..."
-msgstr "保存中..."
-
-#: app/templates/
-msgid "Share your referral link. When your friend creates their first song, you both get 10 credits!"
-msgstr "分享你的邀请链接。当好友创作第一首歌曲时，你们都将获得 10 次生成次数！"
-
-#: app/templates/
-msgid "Show inactive only"
-msgstr "仅显示已禁用"
-
-#: app/templates/
-msgid "Simple HTTP endpoints for music generation"
-msgstr "简单的 HTTP 接口用于音乐生成"
-
-#: app/templates/
-msgid "Smart Lyrics Generator"
-msgstr "智能歌词生成器"
-
-#: app/templates/
-msgid "Solutions"
-msgstr "解决方案"
-
-#: app/templates/
-msgid "Split audio into vocals, drums, bass, and more"
-msgstr "将音频分离为人声、鼓、贝斯等音轨"
-
-#: app/templates/
-msgid "Start generating music with AI today. No credit card required."
-msgstr "今天就开始用 AI 创作音乐，无需信用卡。"
-
-#: app/templates/
-msgid "Stem Separation"
-msgstr "音频分轨"
-
-#: app/templates/
-msgid "Style Tags"
-msgstr "风格标签"
-
-#: app/templates/
-msgid "Style Templates"
-msgstr "风格模板"
-
-#: app/templates/
-msgid "Template Name"
-msgstr "模板名称"
-
-#: app/templates/
-msgid "Terms of Service"
-msgstr "服务条款"
-
-#: app/templates/
-msgid "Text-to-Speech"
-msgstr "文本转语音"
-
-#: app/templates/
-msgid "Try API calls directly from your browser"
-msgstr "直接在浏览器中尝试 API 调用"
-
-#: app/templates/
-msgid "Turn Your Ideas Into"
-msgstr "把你的灵感变成"
-
-#: app/templates/
+#: app/templates/pages/templates.html:53
 msgid "Use Template"
 msgstr "使用模板"
 
-#: app/templates/
+#: app/templates/pages/templates.html:56
+msgid "Preview"
+msgstr "预览"
+
+#: app/templates/pages/templates.html:98
 msgid "Use This Template"
 msgstr "使用此模板"
 
-#: app/templates/
-msgid "View Enterprise Plan"
-msgstr "查看企业方案"
-
-#: app/templates/
-msgid "Voice Cloning"
-msgstr "人声克隆"
-
-#: app/templates/
-msgid "Whether you are a studio, content creator, or business — Avireon gives you the tools to produce professional music at scale."
-msgstr "无论你是工作室、内容创作者还是企业，Avireon 为你提供规模化制作专业音乐的工具。"
-
-#: app/templates/
-msgid "e.g. 古风,流行,电子"
-msgstr "例如：古风、流行、电子"
-
-#: app/templates/
-msgid "none"
-msgstr "无"

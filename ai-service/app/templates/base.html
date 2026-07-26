@@ -7,18 +7,17 @@
   <meta name="description" content="{% block description %}Avireon - AI Music Creation Platform{% endblock %}">
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <link rel="stylesheet" href="/static/css/tailwind.css">
   <style>[x-cloak] { display: none !important; }</style>
   {% block head %}{% endblock %}
 </head>
-<body x-data="app()" x-init="init()" :class="{ 'dark': theme === 'dark' }" class="bg-white dark:bg-gray-950 text-gray-900 dark:text-white min-h-screen flex flex-col transition-colors duration-200">
+<body x-data="app()" x-init="init()" class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
   <script>
     window.TRANSLATIONS = {{ translations_json|safe }};
     function app() {
       return {
-        theme: localStorage.getItem('theme') || 'dark',
         lang: localStorage.getItem('lang') || '{{ current_locale }}',
         translations: window.TRANSLATIONS || {},
+        isLoggedIn: !!localStorage.getItem('token'),
         t(key) {
           const dict = this.translations[this.lang];
           return dict && dict[key] ? dict[key] : key;
@@ -29,14 +28,14 @@
           document.cookie = 'lang=' + l + ';path=/;max-age=' + 365*86400;
           document.documentElement.lang = l;
         },
-        toggleTheme() {
-          this.theme = this.theme === 'dark' ? 'light' : 'dark';
-          localStorage.setItem('theme', this.theme);
+        logout() {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          this.isLoggedIn = false;
+          window.location.href = '/';
         },
         init() {
-          if (this.theme === 'light') {
-            document.documentElement.classList.remove('dark');
-          }
+          this.isLoggedIn = !!localStorage.getItem('token');
         }
       };
     }

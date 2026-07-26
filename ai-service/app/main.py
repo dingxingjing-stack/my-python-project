@@ -10,7 +10,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from app.config import get_settings
 from app.database import close_db, init_db
@@ -257,14 +257,29 @@ def _register_routers(app: FastAPI) -> None:
         from app.services.feature_flags import features_summary
         return features_summary()
 
-    # ── 根路径 GET + HEAD 兼容（消除外部扫描 405 日志） ──
-    @app.get("/", include_in_schema=False)
+    # ── 根路径 — 渲染企业官网首页 ──
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def root():
-        return {"service": "Avireon Music", "version": "2.0.0", "status": "ok"}
+        import pathlib
+        home_path = pathlib.Path(__file__).resolve().parent / "static" / "home.html"
+        return FileResponse(str(home_path))
 
     @app.head("/", include_in_schema=False)
     async def root_head():
         return JSONResponse(content=None)
+
+    # ── 登录/注册页面 (静态文件) ──
+    @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
+    async def login_page():
+        import pathlib
+        login_path = pathlib.Path(__file__).resolve().parent / "static" / "login.html"
+        return FileResponse(str(login_path))
+
+    @app.get("/register", response_class=HTMLResponse, include_in_schema=False)
+    async def register_page():
+        import pathlib
+        reg_path = pathlib.Path(__file__).resolve().parent / "static" / "register.html"
+        return FileResponse(str(reg_path))
 
 
 # Singleton

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="{{ current_locale }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ _('Console') }} — Avireon</title>
+  <meta name="description" content="Avireon Console - AI Music Production Workspace">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body x-data="consoleApp()" x-init="init()" class="bg-gray-950 text-gray-100 min-h-screen flex">
+  <script>
+    window.TRANSLATIONS = {{ translations_json|safe }};
+    function consoleApp() {
+      return {
+        lang: localStorage.getItem('lang') || '{{ current_locale }}',
+        translations: window.TRANSLATIONS || {},
+        activeNav: 'music',
+        t(key) {
+          const dict = this.translations[this.lang];
+          return dict && dict[key] ? dict[key] : key;
+        },
+        setLang(l) {
+          this.lang = l;
+          localStorage.setItem('lang', l);
+          document.cookie = 'lang=' + l + ';path=/;max-age=' + 365*86400;
+        },
+        navTitle() {
+          const titles = { music: 'Music Generation', lyrics: 'Lyrics Creation', tts: 'Voice Synthesis', mv: 'MV Production', tasks: 'Task Records', settings: 'Account Settings' };
+          return this.t(titles[this.activeNav] || 'Music Generation');
+        },
+        logout() {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/';
+        },
+        init() {
+          if (!localStorage.getItem('token')) {
+            window.location.href = '/login';
+          }
+        }
+      };
+    }
+  </script>
+
+  <!-- Sidebar -->
+  <aside class="w-60 bg-gray-900 border-r border-gray-800 flex flex-col flex-shrink-0">
+    <div class="p-4 border-b border-gray-800">
+      <a href="/" class="text-lg font-bold text-blue-400">Avireon</a>
+      <div class="text-xs text-gray-500 mt-1" x-text="t('Production Console')">{{ _('Production Console') }}</div>
+    </div>
+    <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+      <a href="/create" @click="activeNav='music'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-gray-800 hover:text-white text-gray-400">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+        <span x-text="t('Music Generation')">{{ _('Music Generation') }}</span>
+      </a>
+      <a href="/create?tab=lyrics" @click="activeNav='lyrics'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-gray-800 hover:text-white text-gray-400">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        <span x-text="t('Lyrics Creation')">{{ _('Lyrics Creation') }}</span>
+      </a>
+      <a href="/create?tab=tts" @click="activeNav='tts'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-gray-800 hover:text-white text-gray-400">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+        <span x-text="t('Voice Synthesis')">{{ _('Voice Synthesis') }}</span>
+      </a>
+      <a href="/create?tab=mv" @click="activeNav='mv'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-gray-800 hover:text-white text-gray-400">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+        <span x-text="t('MV Production')">{{ _('MV Production') }}</span>
+      </a>
+
+      <div class="border-t border-gray-800 my-3"></div>
+
+      <a href="/library" @click="activeNav='tasks'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-gray-800 hover:text-white text-gray-400">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span x-text="t('Task Records')">{{ _('Task Records') }}</span>
+      </a>
+      <a href="/settings" @click="activeNav='settings'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-gray-800 hover:text-white text-gray-400">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span x-text="t('Account Settings')">{{ _('Account Settings') }}</span>
+      </a>
+    </nav>
+
+    <!-- Bottom actions -->
+    <div class="p-3 border-t border-gray-800">
+      <button @click="logout()" class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-800 hover:text-gray-300 transition">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        <span x-text="t('Sign Out')">{{ _('Sign Out') }}</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main content area -->
+  <div class="flex-1 flex flex-col">
+    <!-- Top bar -->
+    <header class="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-6 flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <h2 class="text-base font-semibold text-white" x-text="navTitle()">Music Generation</h2>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- Language -->
+        <div x-data="{ open: false }" class="relative">
+          <button @click="open = !open" class="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition border border-gray-700">
+            <span x-text="lang === 'zh_CN' ? '中文' : 'EN'">EN</span>
+          </button>
+          <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-32 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 overflow-hidden">
+            <button @click="setLang('en'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition">
+              <span :class="{ 'font-semibold text-blue-400': lang === 'en' }">English</span>
+            </button>
+            <button @click="setLang('zh_CN'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition">
+              <span :class="{ 'font-semibold text-blue-400': lang === 'zh_CN' }">简体中文</span>
+            </button>
+          </div>
+        </div>
+        <a href="/" class="text-xs text-gray-500 hover:text-gray-300 transition" x-text="t('Back to Website')">{{ _('Back to Website') }}</a>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <main class="flex-1 overflow-y-auto bg-gray-950 p-6">
+      <div class="max-w-5xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div class="rounded-lg bg-gray-900 border border-gray-800 p-4">
+            <div class="text-2xl font-bold text-white" id="daily-generations">0/10</div>
+            <div class="text-xs text-gray-500 mt-1" x-text="t('Today\'s Generations')">{{ _("Today's Generations") }}</div>
+          </div>
+          <div class="rounded-lg bg-gray-900 border border-gray-800 p-4">
+            <div class="text-2xl font-bold text-white" id="total-works">0</div>
+            <div class="text-xs text-gray-500 mt-1" x-text="t('Total Works')">{{ _('Total Works') }}</div>
+          </div>
+          <div class="rounded-lg bg-gray-900 border border-gray-800 p-4">
+            <div class="text-2xl font-bold text-white" id="mv-count">0/3</div>
+            <div class="text-xs text-gray-500 mt-1" x-text="t('MV Quota')">{{ _('MV Quota') }}</div>
+          </div>
+          <div class="rounded-lg bg-gray-900 border border-gray-800 p-4">
+            <div class="text-2xl font-bold text-blue-400" id="plan-tier" x-text="t('Free')">{{ _('Free') }}</div>
+            <div class="text-xs text-gray-500 mt-1" x-text="t('Current Plan')">{{ _('Current Plan') }}</div>
+          </div>
+        </div>
+
+        <div class="rounded-lg bg-gray-900 border border-gray-800 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-base font-semibold text-white" x-text="t('Quick Actions')">{{ _('Quick Actions') }}</h3>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <a href="/create" class="flex items-center gap-4 p-4 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition group">
+              <div class="w-10 h-10 rounded-lg bg-blue-900/50 flex items-center justify-center text-lg group-hover:bg-blue-900/70 transition">🎵</div>
+              <div>
+                <div class="text-sm font-medium text-white" x-text="t('New Music Generation')">{{ _('New Music Generation') }}</div>
+                <div class="text-xs text-gray-500 mt-0.5" x-text="t('Create a new song with AI')">{{ _('Create a new song with AI') }}</div>
+              </div>
+            </a>
+            <a href="/library" class="flex items-center gap-4 p-4 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 transition group">
+              <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-lg group-hover:bg-gray-700/70 transition">📂</div>
+              <div>
+                <div class="text-sm font-medium text-white" x-text="t('My Works')">{{ _('My Works') }}</div>
+                <div class="text-xs text-gray-500 mt-0.5" x-text="t('Browse your creations')">{{ _('Browse your creations') }}</div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      fetch('/api/v1/credits')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('daily-generations').textContent = (data.ai_calls_count ?? 0) + '/' + (data.ai_calls_limit ?? 10);
+          document.getElementById('mv-count').textContent = (data.mv_count ?? 0) + '/' + (data.mv_limit ?? 3);
+          if (data.total_works !== undefined) document.getElementById('total-works').textContent = data.total_works;
+        })
+        .catch(() => {});
+    });
+  </script>
+</body>
+</html>

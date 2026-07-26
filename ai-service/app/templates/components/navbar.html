@@ -1,64 +1,76 @@
-<nav class="sticky top-0 z-50 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md">
+<nav class="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-16">
       <!-- Logo -->
-      <div class="flex items-center gap-8">
-        <a href="/" class="text-xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-pink-500 dark:from-purple-400 dark:to-pink-500 bg-clip-text text-transparent">Avireon</a>
+      <div class="flex items-center gap-10">
+        <a href="/" class="text-xl font-bold tracking-tight text-blue-700">Avireon</a>
         <div class="hidden lg:flex items-center gap-1">
-          <a href="/" class="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition" x-text="$store?.app?.t ? $store.app.t('Products') : 'Products'">Products</a>
-          <a href="/solutions" class="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition" x-text="$store?.app?.t ? $store.app.t('Solutions') : 'Solutions'">Solutions</a>
-          <a href="/pricing" class="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition" x-text="$store?.app?.t ? $store.app.t('Pricing') : 'Pricing'">Pricing</a>
-          <a href="/docs" class="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition" x-text="$store?.app?.t ? $store.app.t('Docs') : 'Docs'">Docs</a>
-          <a href="/enterprise" class="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition" x-text="$store?.app?.t ? $store.app.t('Enterprise') : 'Enterprise'">Enterprise</a>
+          <a href="/" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Products')">{{ _('Products') }}</a>
+          <a href="/solutions" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Solutions')">{{ _('Solutions') }}</a>
+          <a href="/pricing" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Pricing')">{{ _('Pricing') }}</a>
+          <a href="/docs" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Developer Docs')">{{ _('Developer Docs') }}</a>
         </div>
       </div>
 
       <!-- Right side -->
-      <div class="flex items-center gap-3">
-        <!-- Theme toggle -->
-        <button @click="toggleTheme()" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition" x-text="theme === 'dark' ? '☀️' : '🌙'">☀️</button>
-
-        <!-- Language Switcher (always visible) -->
+      <div class="flex items-center gap-2">
+        <!-- Language Switcher -->
         <div x-data="{ open: false }" class="relative">
-          <button @click="open = !open" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition border border-gray-200 dark:border-gray-700">
+          <button @click="open = !open" class="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition border border-gray-200">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
             <span x-text="lang === 'zh_CN' ? '中文' : 'EN'">EN</span>
           </button>
           <div x-show="open" @click.away="open = false" x-transition
-               class="absolute right-0 mt-2 w-36 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1 overflow-hidden">
-            <button @click="setLang('en'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-              <span class="text-base">🇺🇸</span>
-              <span :class="{ 'font-semibold text-purple-600 dark:text-purple-400': lang === 'en' }">English</span>
+               class="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
+            <button @click="setLang('en'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
+              <span :class="{ 'font-semibold text-blue-600': lang === 'en' }">English</span>
             </button>
-            <button @click="setLang('zh_CN'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-              <span class="text-base">🇨🇳</span>
-              <span :class="{ 'font-semibold text-purple-600 dark:text-purple-400': lang === 'zh_CN' }">简体中文</span>
+            <button @click="setLang('zh_CN'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
+              <span :class="{ 'font-semibold text-blue-600': lang === 'zh_CN' }">简体中文</span>
             </button>
           </div>
         </div>
 
-        <!-- Auth -->
-        <a href="/login" class="hidden sm:inline-flex text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-4 py-2 transition" x-text="t('Sign In')">Sign In</a>
-        <a href="/register" class="inline-flex items-center text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg transition shadow-sm" x-text="t('Get Started')">Get Started</a>
+        <!-- Auth: logged in -->
+        <template x-if="isLoggedIn">
+          <a href="/console" class="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg transition shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+            <span x-text="t('Console')">{{ _('Console') }}</span>
+          </a>
+        </template>
+
+        <!-- Auth: logged out -->
+        <template x-if="!isLoggedIn">
+          <div class="flex items-center gap-2">
+            <a href="/login" class="hidden sm:inline-flex text-sm font-medium text-gray-600 hover:text-blue-700 px-4 py-2 transition" x-text="t('Sign In')">{{ _('Sign In') }}</a>
+            <a href="/register" class="inline-flex items-center text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg transition shadow-sm" x-text="t('Get Started')">{{ _('Get Started') }}</a>
+          </div>
+        </template>
 
         <!-- Mobile menu button -->
-        <button x-data @click="$store.mobileNav = !$store.mobileNav" class="lg:hidden p-2 text-gray-500 hover:text-gray-700 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+        <button x-data @click="$store.mobileNav = !$store.mobileNav" class="lg:hidden p-2 text-gray-500 hover:text-blue-700 rounded-lg hover:bg-blue-50">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
       </div>
     </div>
   </div>
   <!-- Mobile nav -->
-  <div x-data x-show="$store.mobileNav" @click.away="$store.mobileNav = false" x-transition class="lg:hidden border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+  <div x-data x-show="$store.mobileNav" @click.away="$store.mobileNav = false" x-transition class="lg:hidden border-t border-gray-200 bg-white">
     <div class="px-4 py-3 space-y-1">
-      <a href="/" class="block px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" x-text="t('Products')">Products</a>
-      <a href="/solutions" class="block px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" x-text="t('Solutions')">Solutions</a>
-      <a href="/pricing" class="block px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" x-text="t('Pricing')">Pricing</a>
-      <a href="/docs" class="block px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" x-text="t('Docs')">Docs</a>
-      <a href="/enterprise" class="block px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" x-text="t('Enterprise')">Enterprise</a>
-      <hr class="border-gray-200 dark:border-gray-700 my-2">
-      <a href="/login" class="block px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300" x-text="t('Sign In')">Sign In</a>
-      <a href="/register" class="block px-3 py-2 text-sm font-semibold text-white bg-purple-600 rounded-lg text-center" x-text="t('Get Started')">Get Started</a>
+      <a href="/" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Products')">{{ _('Products') }}</a>
+      <a href="/solutions" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Solutions')">{{ _('Solutions') }}</a>
+      <a href="/pricing" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Pricing')">{{ _('Pricing') }}</a>
+      <a href="/docs" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Developer Docs')">{{ _('Developer Docs') }}</a>
+      <hr class="border-gray-200 my-2">
+      <template x-if="isLoggedIn">
+        <a href="/console" class="block px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg text-center" x-text="t('Console')">{{ _('Console') }}</a>
+      </template>
+      <template x-if="!isLoggedIn">
+        <div class="space-y-1">
+          <a href="/login" class="block px-3 py-2 text-sm font-medium text-gray-600" x-text="t('Sign In')">{{ _('Sign In') }}</a>
+          <a href="/register" class="block px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg text-center" x-text="t('Get Started')">{{ _('Get Started') }}</a>
+        </div>
+      </template>
     </div>
   </div>
 </nav>
