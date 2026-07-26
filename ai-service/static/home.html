@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">Avireon — AI-Powered Music Creation Platform for Enterprise</title>
+  <meta name="description" content="Avireon is an AI-powered music creation platform for enterprises. Generate original music, lyrics, voiceovers, and music videos.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body x-data="app()" x-init="init()" class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
+  <script>
+    window.TRANSLATIONS = {};
+    var _lang = 'en';
+    try { _lang = localStorage.getItem('lang') || document.cookie.replace(/(?:(?:^|.*;\s*)lang\s*=\s*([^;]*).*$)|^.*$/, '$1') || 'en'; } catch(e) {}
+    fetch('/api/v1/lang/translations').then(r=>r.json()).then(d=>{ window.TRANSLATIONS = d; }).catch(()=>{});
+    function app() {
+      return {
+        lang: _lang,
+        translations: window.TRANSLATIONS,
+        isLoggedIn: (function(){ try{return !!localStorage.getItem('token');}catch(e){return false;} })(),
+        t(key) {
+          var dict = this.translations && this.translations[this.lang];
+          return (dict && dict[key]) ? dict[key] : key;
+        },
+        setLang: function(l) {
+          this.lang = l;
+          try { localStorage.setItem('lang', l); } catch(e) {}
+          document.cookie = 'lang=' + l + ';path=/;max-age=' + 365*86400;
+          document.documentElement.lang = l;
+          fetch('/api/v1/lang/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({locale:l}) }).catch(function(){});
+        },
+        logout: function() {
+          try { localStorage.removeItem('token'); localStorage.removeItem('user'); } catch(e) {}
+          this.isLoggedIn = false;
+          window.location.href = '/';
+        },
+        init: function() {
+          var self = this;
+          this.isLoggedIn = (function(){ try{return !!localStorage.getItem('token');}catch(e){return false;} })();
+          document.documentElement.lang = this.lang;
+          fetch('/api/v1/lang/translations').then(function(r){return r.json();}).then(function(d){
+            self.translations = d;
+          }).catch(function(){});
+        }
+      };
+    }
+  </script>
+
+  <!-- Navbar -->
+  <nav class="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-10">
+          <a href="/" class="text-xl font-bold tracking-tight text-blue-700">Avireon</a>
+          <div class="hidden lg:flex items-center gap-1">
+            <a href="/" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Products')">Products</a>
+            <a href="/solutions" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Solutions')">Solutions</a>
+            <a href="/pricing" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Pricing')">Pricing</a>
+            <a href="/docs" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Developer Docs')">Developer Docs</a>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div x-data="{ open: false }" class="relative">
+            <button @click="open = !open" class="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition border border-gray-200">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+              <span x-text="lang === 'zh_CN' ? '中文' : 'EN'">EN</span>
+            </button>
+            <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden z-50">
+              <button @click="setLang('en'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
+                <span :class="{ 'font-semibold text-blue-600': lang === 'en' }">English</span>
+              </button>
+              <button @click="setLang('zh_CN'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
+                <span :class="{ 'font-semibold text-blue-600': lang === 'zh_CN' }">简体中文</span>
+              </button>
+            </div>
+          </div>
+          <template x-if="isLoggedIn">
+            <a href="/console" class="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg transition shadow-sm">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+              <span x-text="t('Console')">Console</span>
+            </a>
+          </template>
+          <template x-if="!isLoggedIn">
+            <div class="flex items-center gap-2">
+              <a href="/login" class="hidden sm:inline-flex text-sm font-medium text-gray-600 hover:text-blue-700 px-4 py-2 transition" x-text="t('Sign In')">Sign In</a>
+              <a href="/register" class="inline-flex items-center text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg transition shadow-sm" x-text="t('Get Started')">Get Started</a>
+            </div>
+          </template>
+          <button x-data @click="$store.mobileNav = !$store.mobileNav" class="lg:hidden p-2 text-gray-500 hover:text-blue-700 rounded-lg hover:bg-blue-50">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div x-data x-show="$store.mobileNav" @click.away="$store.mobileNav = false" x-transition class="lg:hidden border-t border-gray-200 bg-white">
+      <div class="px-4 py-3 space-y-1">
+        <a href="/" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Products')">Products</a>
+        <a href="/solutions" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Solutions')">Solutions</a>
+        <a href="/pricing" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Pricing')">Pricing</a>
+        <a href="/docs" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Developer Docs')">Developer Docs</a>
+        <hr class="border-gray-200 my-2">
+        <template x-if="isLoggedIn">
+          <a href="/console" class="block px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg text-center" x-text="t('Console')">Console</a>
+        </template>
+        <template x-if="!isLoggedIn">
+          <div class="space-y-1">
+            <a href="/login" class="block px-3 py-2 text-sm font-medium text-gray-600" x-text="t('Sign In')">Sign In</a>
+            <a href="/register" class="block px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg text-center" x-text="t('Get Started')">Get Started</a>
+          </div>
+        </template>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1">
+
+    <!-- Hero Section -->
+    <section class="hero-bg pt-20 pb-16 sm:pt-28 sm:pb-20 px-4">
+      <div class="max-w-5xl mx-auto text-center">
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight text-gray-900">
+          <span x-text="t('AI-Powered One-Stop Music Creation Platform')">AI-Powered One-Stop Music Creation Platform</span>
+        </h1>
+        <p class="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto mb-10 leading-relaxed" x-text="t('Enable music generation, lyric creation, voice processing, and audio post-production to enter enterprise-grade workflows — efficiently, at scale, with AI.')">
+          Enable music generation, lyric creation, voice processing, and audio post-production to enter enterprise-grade workflows — efficiently, at scale, with AI.
+        </p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a href="/create" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg text-base font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow-lg shadow-blue-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+            <span x-text="t('Try Music Generation Free')">Try Music Generation Free</span>
+          </a>
+          <a href="/enterprise" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg text-base font-medium text-gray-700 bg-white hover:bg-gray-50 transition border border-gray-300 shadow-sm">
+            <span x-text="t('View Enterprise Plan')">View Enterprise Plan</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+          </a>
+        </div>
+        <div class="mt-10 flex items-center justify-center gap-8 text-sm text-gray-500">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span x-text="t('No credit card required')">No credit card required</span>
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span x-text="t('Daily free quota included')">Daily free quota included</span>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Grid (Stage 1) -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div class="text-center mb-14">
+        <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4" x-text="t('Core Capabilities')">Core Capabilities</h2>
+        <p class="text-lg text-gray-500 max-w-xl mx-auto" x-text="t('Four core AI-powered tools available now. Professional production tools coming in subsequent phases.')">Four core AI-powered tools available now. Professional production tools coming in subsequent phases.</p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+          <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">🎵</div>
+          <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('AI Music Generation')">AI Music Generation</h3>
+          <p class="text-sm text-gray-500 leading-relaxed" x-text="t('Describe your song. AI generates complete music with vocals in minutes.')">Describe your song. AI generates complete music with vocals in minutes.</p>
+        </div>
+        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+          <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">📝</div>
+          <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('Lyrics Creation')">Lyrics Creation</h3>
+          <p class="text-sm text-gray-500 leading-relaxed" x-text="t('AI writes lyrics in any style and language. Generate verses, chorus, and LRC format.')">AI writes lyrics in any style and language. Generate verses, chorus, and LRC format.</p>
+        </div>
+        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+          <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">🔊</div>
+          <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('Voice Synthesis')">Voice Synthesis</h3>
+          <p class="text-sm text-gray-500 leading-relaxed" x-text="t('Convert text to natural speech. Multiple voice options and languages supported.')">Convert text to natural speech. Multiple voice options and languages supported.</p>
+        </div>
+        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+          <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">🎬</div>
+          <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('MV Generation')">MV Generation</h3>
+          <p class="text-sm text-gray-500 leading-relaxed" x-text="t('Auto-generate music videos from your songs. Multiple visual styles available.')">Auto-generate music videos from your songs. Multiple visual styles available.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Enterprise Section -->
+    <section class="bg-white border-t border-b border-gray-200">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-6" x-text="t('Built for Enterprise Music Production')">Built for Enterprise Music Production</h2>
+            <p class="text-lg text-gray-600 mb-8" x-text="t('Avireon provides enterprises with efficient AI-powered music production tools, helping studios, content teams, and businesses achieve high-quality music output at scale.')">Avireon provides enterprises with efficient AI-powered music production tools, helping studios, content teams, and businesses achieve high-quality music output at scale.</p>
+            <div class="space-y-4">
+              <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <div><p class="font-medium text-gray-900" x-text="t('For Music Studios')">For Music Studios</p><p class="text-sm text-gray-500" x-text="t('Batch music generation and efficient production pipeline')">Batch music generation and efficient production pipeline</p></div>
+              </div>
+              <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <div><p class="font-medium text-gray-900" x-text="t('For Content Teams')">For Content Teams</p><p class="text-sm text-gray-500" x-text="t('Quick music and voiceover generation for videos and podcasts')">Quick music and voiceover generation for videos and podcasts</p></div>
+              </div>
+              <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <div><p class="font-medium text-gray-900" x-text="t('For Business')">For Business</p><p class="text-sm text-gray-500" x-text="t('Custom solutions, API access, and dedicated enterprise support')">Custom solutions, API access, and dedicated enterprise support</p></div>
+              </div>
+            </div>
+            <a href="/enterprise" class="inline-flex items-center gap-2 mt-8 text-blue-600 font-medium hover:text-blue-500 transition">
+              <span x-text="t('Explore enterprise solutions')">Explore enterprise solutions</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+            </a>
+          </div>
+          <div class="hidden lg:block">
+            <div class="aspect-[4/3] rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 flex items-center justify-center">
+              <div class="text-center p-12">
+                <div class="text-6xl mb-4">🏢</div>
+                <p class="text-lg font-semibold text-blue-800">Avireon</p>
+                <p class="text-sm text-blue-600 mt-2" x-text="t('Enterprise AI Music Platform')">Enterprise AI Music Platform</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+      <div class="rounded-xl bg-blue-600 p-12 sm:p-16">
+        <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4" x-text="t('Ready to Transform Your Music Workflow?')">Ready to Transform Your Music Workflow?</h2>
+        <p class="text-lg text-blue-100 max-w-lg mx-auto mb-8" x-text="t('Start creating with AI today. No credit card required.')">Start creating with AI today. No credit card required.</p>
+        <a href="/create" class="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg text-base font-semibold text-blue-700 bg-white hover:bg-gray-100 transition shadow-lg">
+          <span x-text="t('Get Started Free')">Get Started Free</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-200 bg-white mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4" x-text="t('Product')">Product</h3>
+          <ul class="space-y-2">
+            <li><a href="/create" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('AI Music Generation')">AI Music Generation</a></li>
+            <li><a href="/create" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Lyrics Generator')">Lyrics Generator</a></li>
+            <li><a href="/create" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Text to Speech')">Text to Speech</a></li>
+            <li><a href="/create" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('MV Templates')">MV Templates</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4" x-text="t('Documentation')">Documentation</h3>
+          <ul class="space-y-2">
+            <li><a href="/docs" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Quick Start')">Quick Start</a></li>
+            <li><a href="/docs" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('API Reference')">API Reference</a></li>
+            <li><a href="/docs" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Integration Guide')">Integration Guide</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4" x-text="t('Pricing')">Pricing</h3>
+          <ul class="space-y-2">
+            <li><a href="/pricing" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Starter')">Starter</a></li>
+            <li><a href="/pricing" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Professional')">Professional</a></li>
+            <li><a href="/pricing" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Enterprise')">Enterprise</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4" x-text="t('Contact')">Contact</h3>
+          <ul class="space-y-2">
+            <li><a href="/contact" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('Contact Us')">Contact Us</a></li>
+            <li><a href="/about" class="text-sm text-gray-600 hover:text-blue-700 transition" x-text="t('About')">About</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="border-t border-gray-200 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-2">
+          <span class="text-lg font-bold text-blue-700">Avireon</span>
+          <span class="text-sm text-gray-500">© 2026</span>
+        </div>
+        <div class="flex items-center gap-6 text-sm text-gray-500">
+          <a href="/privacy" class="hover:text-blue-700 transition" x-text="t('Privacy Policy')">Privacy Policy</a>
+          <a href="/terms" class="hover:text-blue-700 transition" x-text="t('Terms of Service')">Terms of Service</a>
+          <a href="/contact" class="hover:text-blue-700 transition" x-text="t('Contact Us')">Contact Us</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('alpine:init', function() {
+      if (!Alpine.store('mobileNav')) {
+        Alpine.store('mobileNav', false);
+      }
+    });
+  </script>
+</body>
+</html>

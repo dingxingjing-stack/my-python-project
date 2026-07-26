@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from jinja2 import Environment
 
 from app.i18n import i18n_context
@@ -30,12 +30,6 @@ class I18nTemplates(Jinja2Templates):
         return super().TemplateResponse(request, name, context, status_code)
 
 _templates = I18nTemplates(directory="app/templates")
-
-
-@router.get("/", response_class=HTMLResponse, include_in_schema=False)
-async def home(request: Request):
-    """首页 — 企业官网。"""
-    return _templates.TemplateResponse(request, "pages/home.html")
 
 
 @router.get("/create", response_class=HTMLResponse, include_in_schema=False)
@@ -126,26 +120,6 @@ async def templates_page(request: Request):
 async def console_page(request: Request):
     """产品控制台（登录后进入）。"""
     return _templates.TemplateResponse(request, "pages/console.html")
-
-
-@router.get("/login", response_class=HTMLResponse, include_in_schema=False)
-async def login_page():
-    """登录页 — 读取 static/login.html。"""
-    import pathlib
-    return FileResponse(
-        str(pathlib.Path(__file__).resolve().parent.parent / "static" / "login.html"),
-        media_type="text/html; charset=utf-8",
-    )
-
-
-@router.get("/register", response_class=HTMLResponse, include_in_schema=False)
-async def register_page():
-    """注册页 — 读取 static/register.html。"""
-    import pathlib
-    return FileResponse(
-        str(pathlib.Path(__file__).resolve().parent.parent / "static" / "register.html"),
-        media_type="text/html; charset=utf-8",
-    )
 
 
 @router.get("/admin", response_class=HTMLResponse, include_in_schema=False)
