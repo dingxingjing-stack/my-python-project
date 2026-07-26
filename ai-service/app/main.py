@@ -258,29 +258,32 @@ def _register_routers(app: FastAPI) -> None:
         from app.services.feature_flags import features_summary
         return features_summary()
 
-    # ── 根路径 — 读取 static/home.html 返回企业官网首页 ──
+    # ── 根路径 — 读取 static/home.html 渲染企业官网首页 ──
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    async def root():
-        import pathlib
-        home = pathlib.Path(__file__).resolve().parent.parent / "static" / "home.html"
-        return FileResponse(str(home), media_type="text/html; charset=utf-8")
+    async def index_page():
+        with open("static/home.html", "r", encoding="utf-8") as f:
+            return f.read()
 
     @app.head("/", include_in_schema=False)
     async def root_head():
         return JSONResponse(content=None)
 
+    # ── 登录后深色创作控制台 ──
+    @app.get("/console", response_class=HTMLResponse, include_in_schema=False)
+    async def console_page():
+        with open("static/console.html", "r", encoding="utf-8") as f:
+            return f.read()
+
     # ── 登录/注册页面 ──
     @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
     async def login_page():
-        import pathlib
-        login = pathlib.Path(__file__).resolve().parent.parent / "static" / "login.html"
-        return FileResponse(str(login), media_type="text/html; charset=utf-8")
+        with open("static/login.html", "r", encoding="utf-8") as f:
+            return f.read()
 
     @app.get("/register", response_class=HTMLResponse, include_in_schema=False)
     async def register_page():
-        import pathlib
-        reg = pathlib.Path(__file__).resolve().parent.parent / "static" / "register.html"
-        return FileResponse(str(reg), media_type="text/html; charset=utf-8")
+        with open("static/register.html", "r", encoding="utf-8") as f:
+            return f.read()
 
 
 # Singleton
