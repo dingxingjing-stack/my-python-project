@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     runway_api_key: str = ""
     runway_api_base: str = "https://api.runwayml.com/v1"
 
+    # ── 灰度管控 ──
+    # FEATURE_STAGE 1/2/3，1=公测基础版默认关闭重型功能，3=全量放开
+    feature_stage: int = 1
+
     # ── 本地 SoVITS 声音克隆引擎 ──
     sovits_enabled: bool = False
     sovits_api_base: str = "http://127.0.0.1:9880"
@@ -54,6 +58,9 @@ class Settings(BaseSettings):
     daily_global_max_calls: int = 200
     daily_mv_slots: int = 3
     task_timeout_minutes: int = 30
+
+    # ── 分级限流：重型接口每日调用上限 ──
+    daily_heavy_feature_calls: int = 3
 
     # ── 各服务商每日调用上限 ──
     daily_siliconflow_calls: int = 100

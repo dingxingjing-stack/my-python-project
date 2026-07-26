@@ -22,11 +22,13 @@ from fastapi import APIRouter, HTTPException
 from app.database import get_db
 from app.services.ai_scheduler import get_scheduler
 from app.services.local_storage import get_local_storage
+from app.services.feature_flags import require_feature
 
 router = APIRouter(prefix="/ai", tags=["ai-mv"])
 
 
 @router.post("/mv/generate")
+@require_feature("ai_mv_advanced")
 async def generate_mv_full(req: dict):
     """MV 全流程生成 — 分镜→生图→动态→合成，扣 20 Credits。"""
     user_id = req.get("user_id", 1)

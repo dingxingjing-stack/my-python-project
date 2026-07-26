@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from app.services.mureka_service import mureka_service, MurekaSongRequest, QuotaExceededError
 from app.services.agnes_music_service import agnes_service, AgnesSongRequest
+from app.services.feature_flags import require_feature
 
 router = APIRouter(prefix="/ai", tags=["ai-music"])
 
@@ -123,6 +124,7 @@ class GenerateResponse(BaseModel):
 
 
 @router.post("/generate", response_model=GenerateResponse)
+@require_feature("ai_music")
 async def generate_music(request: GenerateRequest):
     try:
         # 第 8 项：统一 strip 入参，消除空白字符残留

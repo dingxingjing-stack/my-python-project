@@ -1,14 +1,53 @@
-<footer class="border-t border-gray-800 bg-gray-950">
-  <div class="max-w-7xl mx-auto px-6 py-8">
-    <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-2">
-        <span class="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">Avireon</span>
-        <span class="text-gray-600 text-sm">© 2026</span>
+<footer class="border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 mt-auto">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+      <!-- Product -->
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4" x-text="t('Product')">Product</h3>
+        <ul class="space-y-2">
+          <li><a href="/create" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('AI Music Generation')">AI Music</a></li>
+          <li><a href="/create" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Lyrics Generator')">Lyrics</a></li>
+          <li><a href="/templates" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('MV Templates')">MV Templates</a></li>
+          <li><a href="/explore" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Explore')">Explore</a></li>
+        </ul>
       </div>
-      <div class="flex items-center gap-6 text-sm text-gray-500">
-        <a href="/explore" class="hover:text-gray-300 transition">Explore</a>
-        <a href="/templates" class="hover:text-gray-300 transition">Templates</a>
-        <a href="/settings" class="hover:text-gray-300 transition">Settings</a>
+      <!-- Solutions -->
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4" x-text="t('Solutions')">Solutions</h3>
+        <ul class="space-y-2">
+          <li><a href="/enterprise" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('For Studios')">For Studios</a></li>
+          <li><a href="/enterprise" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('For Creators')">For Creators</a></li>
+          <li><a href="/enterprise" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('For Business')">For Business</a></li>
+        </ul>
+      </div>
+      <!-- Developers -->
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4" x-text="t('Developers')">Developers</h3>
+        <ul class="space-y-2">
+          <li><a href="/docs" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('API Docs')">API Docs</a></li>
+          <li><a href="/docs" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Integration Guide')">Integration</a></li>
+          <li><a href="/docs" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Status')">Status</a></li>
+        </ul>
+      </div>
+      <!-- Company -->
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4" x-text="t('Company')">Company</h3>
+        <ul class="space-y-2">
+          <li><a href="/about" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('About')">About</a></li>
+          <li><a href="/blog" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Blog')">Blog</a></li>
+          <li><a href="/contact" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition" x-text="t('Contact')">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-gray-200 dark:border-gray-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <span class="text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-500 dark:from-purple-400 dark:to-pink-500 bg-clip-text text-transparent">Avireon</span>
+        <span class="text-sm text-gray-500 dark:text-gray-500">© 2026</span>
+      </div>
+      <div class="flex items-center gap-6 text-sm text-gray-500 dark:text-gray-500">
+        <a href="/privacy" class="hover:text-gray-700 dark:hover:text-gray-300 transition" x-text="t('Privacy Policy')">Privacy</a>
+        <a href="/terms" class="hover:text-gray-700 dark:hover:text-gray-300 transition" x-text="t('Terms of Service')">Terms</a>
+        <a href="/contact" class="hover:text-gray-700 dark:hover:text-gray-300 transition" x-text="t('Contact Us')">Contact</a>
       </div>
     </div>
   </div>

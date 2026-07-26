@@ -228,6 +228,10 @@ def _register_routers(app: FastAPI) -> None:
     from app.routes.pages import router as pages_router
     app.include_router(pages_router)
 
+    # ── i18n 语言切换 API ──
+    from app.i18n import router as i18n_router
+    app.include_router(i18n_router)
+
     # ── 本地上传文件静态服务 ──
     import pathlib
     uploads_dir = pathlib.Path(__file__).resolve().parent.parent / "data" / "uploads"
@@ -246,6 +250,12 @@ def _register_routers(app: FastAPI) -> None:
     @app.head("/health", include_in_schema=False)
     async def health_head():
         return JSONResponse(content=None, headers={"Content-Length": "15"})
+
+    # ── 功能开关状态查询（前端可用） ──
+    @app.get("/api/v1/features", include_in_schema=False)
+    async def features_endpoint():
+        from app.services.feature_flags import features_summary
+        return features_summary()
 
     # ── 根路径 GET + HEAD 兼容（消除外部扫描 405 日志） ──
     @app.get("/", include_in_schema=False)

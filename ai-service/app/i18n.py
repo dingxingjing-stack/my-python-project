@@ -1,21 +1,25 @@
-"""i18n 国际化支持 — gettext + babel."""
+"""i18n 国际化支持 — 服务端 gettext + 客户端无刷新切换。"""
 from __future__ import annotations
 
 import gettext
+import json
 import os
 from pathlib import Path
 
+from fastapi import APIRouter, Response, Request, Body
+from fastapi.responses import JSONResponse
+
 LOCALES_DIR = Path(__file__).parent / "locales"
 
-# 缓存已加载的翻译对象
 _translations: dict[str, gettext.GNUTranslations] = {}
 
 SUPPORTED_LOCALES = {"zh_CN", "en"}
 DEFAULT_LOCALE = "en"
 
+router = APIRouter(tags=["i18n"])
+
 
 def _load(locale: str) -> gettext.GNUTranslations:
-    """加载指定语言包，缓存。"""
     if locale not in _translations:
         try:
             _translations[locale] = gettext.translation(
@@ -27,11 +31,9 @@ def _load(locale: str) -> gettext.GNUTranslations:
 
 
 def detect_locale(request) -> str:
-    """从 Cookie 或 Accept-Language 头检测用户语言。"""
     cookie = request.cookies.get("lang")
     if cookie in SUPPORTED_LOCALES:
         return cookie
-    # Accept-Language 头
     accept = request.headers.get("accept-language", "")
     for part in accept.split(","):
         lang = part.split(";")[0].strip().replace("-", "_")
@@ -43,15 +45,47 @@ def detect_locale(request) -> str:
 
 
 def make_gettext(locale: str):
-    """生成当前语言环境的 _() 函数。"""
     t = _load(locale)
     return t.gettext
 
 
 def i18n_context(request) -> dict:
-    """注入模板的 i18n 上下文变量。"""
     locale = detect_locale(request)
     return {
         "_": make_gettext(locale),
         "current_locale": locale,
+        "translations_json": build_translations_json(),
     }
+
+
+def build_translations_json() -> str:
+    """构建所有语言的翻译 JSON 字符串，供前端 Alpine.js 使用。"""
+    result = {}
+    for locale in SUPPORTED_LOCALES:
+        t = _load(locale)
+        result[locale] = {}
+        if hasattr(t, "_catalog"):
+            for msgid, msgstr in t._catalog.items():
+                if isinstance(msgid, str) and msgstr:
+                    result[locale][msgid] = msgstr
+    return json.dumps(result, ensure_ascii=False)
+
+
+@router.get("/api/v1/lang/current")
+async def get_current_lang(request: Request):
+    locale = detect_locale(request)
+    return {"locale": locale}
+
+
+@router.post("/api/v1/lang/set")
+async def set_lang(locale: str = Body(..., embed=True), response: Response = Response()):
+    if locale not in SUPPORTED_LOCALES:
+        JSONResponse({"error": "unsupported locale"}, status_code=400)
+    response.set_cookie(key="lang", value=locale, path="/", max_age=365 * 86400)
+    return {"locale": locale, "message": "ok"}
+
+
+@router.get("/api/v1/lang/translations")
+async def get_translations():
+    import json
+    return JSONResponse(content=json.loads(build_translations_json()))

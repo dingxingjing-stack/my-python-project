@@ -7,11 +7,13 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.database import get_db
 from app.services.ai_scheduler import get_scheduler
+from app.services.feature_flags import require_feature
 
 router = APIRouter(prefix="/ai", tags=["ai-cover"])
 
 
 @router.post("/cover/generate")
+@require_feature("ai_cover")
 async def generate_cover(req: dict, request: Request):
     """封面图生成 — 调用 OpenRouter 视觉模型生成绘图提示词，扣 2 Credits。"""
     user_id = req.get("user_id", 1)

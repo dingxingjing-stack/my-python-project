@@ -23,7 +23,7 @@ from app.i18n import i18n_context
 router = APIRouter(tags=["pages"])
 
 class I18nTemplates(Jinja2Templates):
-    """自动注入 _() 翻译函数的 Jinja2Templates。"""
+    """自动注入 _() 翻译函数 + translations_json 的 Jinja2Templates。"""
     def TemplateResponse(self, request, name, context=None, status_code=200):
         context = context or {}
         context.update(i18n_context(request))

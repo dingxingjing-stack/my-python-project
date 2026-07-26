@@ -878,3 +878,442 @@ msgstr "成为第一个创作者"
 msgid "Remix"
 msgstr ""
 
+#: app/templates/
+msgid "10 free generations daily"
+msgstr "每日 10 次免费生成"
+
+#: app/templates/
+msgid "AI Music Generation"
+msgstr "AI 音乐生成"
+
+#: app/templates/
+msgid "AI Music Platform v2.0 — Now in Public Beta"
+msgstr "AI 音乐平台 v2.0 — 公测中"
+
+#: app/templates/
+msgid "AI Music Studio"
+msgstr "AI 音乐工作室"
+
+#: app/templates/
+msgid "AI writes lyrics in any style and language. Generate verses, chorus, and LRC format."
+msgstr "AI 支持多风格多语言歌词创作，自动生成主歌、副歌及 LRC 歌词格式。"
+
+#: app/templates/
+msgid "AI-powered audio mastering for professional quality"
+msgstr "AI 智能母带处理，打造专业级音质"
+
+#: app/templates/
+msgid "AI-powered music generation, voice cloning, and MV creation — all in one enterprise-grade platform. No studio required."
+msgstr "AI 音乐生成、人声克隆、MV 创作一体化企业级平台，无需专业录音棚。"
+
+#: app/templates/
+msgid "API Docs"
+msgstr "API 文档"
+
+#: app/templates/
+msgid "API Keys"
+msgstr "API 密钥"
+
+#: app/templates/
+msgid "About"
+msgstr "关于我们"
+
+#: app/templates/
+msgid "Active"
+msgstr "已启用"
+
+#: app/templates/
+msgid "Advanced MV"
+msgstr "高级 MV"
+
+#: app/templates/
+msgid "Advanced professional tools for music production — collapsed by default"
+msgstr "专业音乐制作高级工具 — 默认折叠"
+
+#: app/templates/
+msgid "Approve"
+msgstr "通过"
+
+#: app/templates/
+msgid "Auto-generate MV from your song. Choose from multiple visual styles and templates."
+msgstr "从你的歌曲自动生成 MV，支持多种视觉风格和模板。"
+
+#: app/templates/
+msgid "Avireon — AI Music Creation Platform for Enterprise"
+msgstr "Avireon — 企业级 AI 音乐创作平台"
+
+#: app/templates/
+msgid "Blog"
+msgstr "博客"
+
+#: app/templates/
+msgid "Browse API Docs"
+msgstr "浏览 API 文档"
+
+#: app/templates/
+msgid "Built for Music Professionals"
+msgstr "为音乐专业人士打造"
+
+#: app/templates/
+msgid "Bulk generation, voice cloning, mastering pipeline"
+msgstr "批量生成、人声克隆、母带处理流水线"
+
+#: app/templates/
+msgid "Cancel"
+msgstr "取消"
+
+#: app/templates/
+msgid "Clone any voice with a short audio sample"
+msgstr "通过短音频样本克隆任意声音"
+
+#: app/templates/
+msgid "Collaborate with your team in real-time"
+msgstr "与团队成员实时协作"
+
+#: app/templates/
+msgid "Coming Soon"
+msgstr "即将推出"
+
+#: app/templates/
+msgid "Company"
+msgstr "公司"
+
+#: app/templates/
+msgid "Contact"
+msgstr "联系我们"
+
+#: app/templates/
+msgid "Contact Us"
+msgstr "联系我们"
+
+#: app/templates/
+msgid "Convert text to natural vocals. Multiple voice options and languages supported."
+msgstr "将文本转为自然人声，支持多种音色和语言。"
+
+#: app/templates/
+msgid "Core features available now in public beta. Professional tools coming soon."
+msgstr "核心功能现已公测开放，专业工具即将推出。"
+
+#: app/templates/
+msgid "Cover"
+msgstr "封面"
+
+#: app/templates/
+msgid "Cover Image URL"
+msgstr "封面图片链接"
+
+#: app/templates/
+msgid "Custom branding, API access, dedicated support"
+msgstr "自定义品牌、API 接入、专属支持"
+
+#: app/templates/
+msgid "Delete this template?"
+msgstr "确认删除此模板？"
+
+#: app/templates/
+msgid "Describe your song in words. AI generates complete music with vocals in minutes."
+msgstr "用文字描述你的歌曲，AI 在几分钟内生成带人声的完整音乐。"
+
+#: app/templates/
+msgid "Developer-Friendly API"
+msgstr "开发者友好 API"
+
+#: app/templates/
+msgid "Developers"
+msgstr "开发者"
+
+#: app/templates/
+msgid "Docs"
+msgstr "文档"
+
+#: app/templates/
+msgid "Edit Template"
+msgstr "编辑模板"
+
+#: app/templates/
+msgid "Enterprise"
+msgstr "企业版"
+
+#: app/templates/
+msgid "Everything You Need to Create Music"
+msgstr "音乐创作所需的一切"
+
+#: app/templates/
+msgid "For Business"
+msgstr "企业用户"
+
+#: app/templates/
+msgid "For Content Creators"
+msgstr "内容创作者"
+
+#: app/templates/
+msgid "For Creators"
+msgstr "创作者"
+
+#: app/templates/
+msgid "For Music Studios"
+msgstr "音乐工作室"
+
+#: app/templates/
+msgid "For Studios"
+msgstr "工作室"
+
+#: app/templates/
+msgid "Full MV production with AI storyboard + video generation"
+msgstr "AI 分镜 + 视频生成的全流程 MV 制作"
+
+#: app/templates/
+msgid "Full pipeline: lyrics → music → cover → MV in a single click."
+msgstr "一键全链路：歌词 → 音乐 → 封面 → MV"
+
+#: app/templates/
+msgid "Generate Music Free"
+msgstr "免费生成音乐"
+
+#: app/templates/
+msgid "Generate keys for your applications"
+msgstr "为你的应用生成密钥"
+
+#: app/templates/
+msgid "Generate original music, clone voices, create music videos with AI. Enterprise-grade audio platform for studios, creators, and businesses."
+msgstr "AI 生成原创音乐、人声克隆、MV 创作 — 面向工作室、创作者和企业的企业级音频平台。"
+
+#: app/templates/
+msgid "Get Started"
+msgstr "开始使用"
+
+#: app/templates/
+msgid "Get Started Free"
+msgstr "免费开始使用"
+
+#: app/templates/
+msgid "Inactive"
+msgstr "已禁用"
+
+#: app/templates/
+msgid "Integrate AI music generation into your own applications with our REST API."
+msgstr "通过 REST API 将 AI 音乐生成集成到你的应用中。"
+
+#: app/templates/
+msgid "Integration Guide"
+msgstr "集成指南"
+
+#: app/templates/
+msgid "Interactive Docs"
+msgstr "交互式文档"
+
+#: app/templates/
+msgid "Learn about enterprise"
+msgstr "了解企业版"
+
+#: app/templates/
+msgid "Lyric Template"
+msgstr "歌词模板"
+
+#: app/templates/
+msgid "Lyrics Generator"
+msgstr "歌词生成器"
+
+#: app/templates/
+msgid "MV Scene Prompt"
+msgstr "MV 场景提示词"
+
+#: app/templates/
+msgid "MV Templates"
+msgstr "MV 模板"
+
+#: app/templates/
+msgid "Mastering"
+msgstr "母带处理"
+
+#: app/templates/
+msgid "Multi-Collab"
+msgstr "多人协作"
+
+#: app/templates/
+msgid "Music Prompt"
+msgstr "音乐提示词"
+
+#: app/templates/
+msgid "Music Video Templates"
+msgstr "MV 模板"
+
+#: app/templates/
+msgid "Name"
+msgstr "名称"
+
+#: app/templates/
+msgid "New Template"
+msgstr "新建模板"
+
+#: app/templates/
+msgid "No credit card required"
+msgstr "无需信用卡"
+
+#: app/templates/
+msgid "No templates found"
+msgstr "未找到模板"
+
+#: app/templates/
+msgid "One-Click Creation"
+msgstr "一键创作"
+
+#: app/templates/
+msgid "Powered by Avireon"
+msgstr "由 Avireon 提供技术支持"
+
+#: app/templates/
+msgid "Pre-built templates for pop, rock, hip-hop, EDM, lo-fi, and more."
+msgstr "预设流行、摇滚、嘻哈、电子、Lo-Fi 等多种曲风模板。"
+
+#: app/templates/
+msgid "Preview"
+msgstr "预览"
+
+#: app/templates/
+msgid "Pricing"
+msgstr "定价"
+
+#: app/templates/
+msgid "Privacy Policy"
+msgstr "隐私政策"
+
+#: app/templates/
+msgid "Pro Studio"
+msgstr "专业工作室"
+
+#: app/templates/
+msgid "Product"
+msgstr "产品"
+
+#: app/templates/
+msgid "Products"
+msgstr "产品"
+
+#: app/templates/
+msgid "Professional Music"
+msgstr "专业音乐"
+
+#: app/templates/
+msgid "Quick music generation for videos, podcasts, and streams"
+msgstr "为视频、播客和直播快速生成音乐"
+
+#: app/templates/
+msgid "REST API"
+msgstr "REST API"
+
+#: app/templates/
+msgid "Ready to Create Your Next Hit?"
+msgstr "准备好创作下一首热单了吗？"
+
+#: app/templates/
+msgid "Reject"
+msgstr "驳回"
+
+#: app/templates/
+msgid "Remix / Remaster"
+msgstr "Remix / 重制"
+
+#: app/templates/
+msgid "Remix existing tracks with AI-powered tools"
+msgstr "使用 AI 工具对现有曲目进行二创改编"
+
+#: app/templates/
+msgid "Save"
+msgstr "保存"
+
+#: app/templates/
+msgid "Save as Template"
+msgstr "保存为模板"
+
+#: app/templates/
+msgid "Saving..."
+msgstr "保存中..."
+
+#: app/templates/
+msgid "Share your referral link. When your friend creates their first song, you both get 10 credits!"
+msgstr "分享你的邀请链接。当好友创作第一首歌曲时，你们都将获得 10 次生成次数！"
+
+#: app/templates/
+msgid "Show inactive only"
+msgstr "仅显示已禁用"
+
+#: app/templates/
+msgid "Simple HTTP endpoints for music generation"
+msgstr "简单的 HTTP 接口用于音乐生成"
+
+#: app/templates/
+msgid "Smart Lyrics Generator"
+msgstr "智能歌词生成器"
+
+#: app/templates/
+msgid "Solutions"
+msgstr "解决方案"
+
+#: app/templates/
+msgid "Split audio into vocals, drums, bass, and more"
+msgstr "将音频分离为人声、鼓、贝斯等音轨"
+
+#: app/templates/
+msgid "Start generating music with AI today. No credit card required."
+msgstr "今天就开始用 AI 创作音乐，无需信用卡。"
+
+#: app/templates/
+msgid "Stem Separation"
+msgstr "音频分轨"
+
+#: app/templates/
+msgid "Style Tags"
+msgstr "风格标签"
+
+#: app/templates/
+msgid "Style Templates"
+msgstr "风格模板"
+
+#: app/templates/
+msgid "Template Name"
+msgstr "模板名称"
+
+#: app/templates/
+msgid "Terms of Service"
+msgstr "服务条款"
+
+#: app/templates/
+msgid "Text-to-Speech"
+msgstr "文本转语音"
+
+#: app/templates/
+msgid "Try API calls directly from your browser"
+msgstr "直接在浏览器中尝试 API 调用"
+
+#: app/templates/
+msgid "Turn Your Ideas Into"
+msgstr "把你的灵感变成"
+
+#: app/templates/
+msgid "Use Template"
+msgstr "使用模板"
+
+#: app/templates/
+msgid "Use This Template"
+msgstr "使用此模板"
+
+#: app/templates/
+msgid "View Enterprise Plan"
+msgstr "查看企业方案"
+
+#: app/templates/
+msgid "Voice Cloning"
+msgstr "人声克隆"
+
+#: app/templates/
+msgid "Whether you are a studio, content creator, or business — Avireon gives you the tools to produce professional music at scale."
+msgstr "无论你是工作室、内容创作者还是企业，Avireon 为你提供规模化制作专业音乐的工具。"
+
+#: app/templates/
+msgid "e.g. 古风,流行,电子"
+msgstr "例如：古风、流行、电子"
+
+#: app/templates/
+msgid "none"
+msgstr "无"

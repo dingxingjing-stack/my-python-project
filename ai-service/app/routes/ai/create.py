@@ -19,6 +19,7 @@ from app.database import get_db
 from app.services.ai_scheduler import get_scheduler
 from app.services.sovits_engine import get_sovits_engine
 from app.services.local_storage import get_local_storage
+from app.services.feature_flags import is_enabled
 
 router = APIRouter(prefix="/ai", tags=["ai-create"])
 
@@ -128,9 +129,9 @@ async def one_click_create(req: OneClickCreateRequest):
         except Exception as exc:
             pass
 
-        # ── 阶段 4：硅基 SDXL 生成封面 ──
+        # ── 阶段 4：硅基 SDXL 生成封面（受 ai_cover 功能开关控制） ──
         try:
-            if result["lyrics"]:
+            if result["lyrics"] and is_enabled("ai_cover"):
                 cover_prompt_result = await scheduler.generate_cover_prompt(
                     lyrics=result["lyrics"],
                     title=result["title"],
@@ -153,8 +154,8 @@ async def one_click_create(req: OneClickCreateRequest):
         except Exception:
             pass
 
-        # ── 阶段 5：MV 生成（硅基 SDXL 生图 + Runway + FFmpeg） ──
-        if req.generate_mv and result["lyrics"]:
+        # ── 阶段 5：MV 生成（受 ai_mv_advanced 功能开关控制） ──
+        if req.generate_mv and result["lyrics"] and is_enabled("ai_mv_advanced"):
             try:
                 from app.routes.ai.mv import _generate_mv_from_lyrics
                 video_url = await _generate_mv_from_lyrics(

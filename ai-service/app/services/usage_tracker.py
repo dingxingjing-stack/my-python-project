@@ -29,6 +29,21 @@ async def ensure_provider_table() -> None:
     await db.commit()
 
 
+async def _migrate_daily_usage() -> None:
+    """迁移 daily_usage 表，添加 heavy_calls_count 列（幂等）。"""
+    db = await get_db()
+    try:
+        await db.execute("ALTER TABLE daily_usage ADD COLUMN heavy_calls_count INTEGER DEFAULT 0")
+        await db.commit()
+    except Exception:
+        pass
+    try:
+        await db.execute("ALTER TABLE user_quota_overrides ADD COLUMN daily_heavy_feature_calls INTEGER")
+        await db.commit()
+    except Exception:
+        pass
+
+
 async def ensure_provider_daily_reset(provider: str) -> dict:
     """确保今日某服务商的用量记录存在。"""
     assert provider in VALID_PROVIDERS, f"Unknown provider: {provider}"
@@ -87,6 +102,9 @@ async def ensure_daily_reset(user_id: int) -> dict:
     today = date.today().isoformat()
     db = await get_db()
 
+    # 迁移：确保 heavy_calls_count 列存在
+    await _migrate_daily_usage()
+
     cur = await db.execute(
         "SELECT * FROM daily_usage WHERE user_id = ? AND usage_date = ?",
         (user_id, today),
@@ -96,7 +114,7 @@ async def ensure_daily_reset(user_id: int) -> dict:
         return dict(row)
 
     await db.execute(
-        "INSERT INTO daily_usage (user_id, usage_date, ai_calls_count, credits_granted, credits_used, mv_count) VALUES (?, ?, 0, 0, 0, 0)",
+        "INSERT INTO daily_usage (user_id, usage_date, ai_calls_count, credits_granted, credits_used, mv_count, heavy_calls_count) VALUES (?, ?, 0, 0, 0, 0, 0)",
         (user_id, today),
     )
     await db.commit()
@@ -115,11 +133,27 @@ async def _get_user_quota_override(user_id: int) -> dict:
 
 
 async def check_daily_limits(user_id: int, action: str) -> dict:
-    """检查用户今日是否还能调用 AI。返回用量信息或抛出 429 异常。"""
+    """检查用户今日是否还能调用 AI。返回用量信息或抛出 429 异常。
+
+    支持分级限流：
+      - light 类功能走通用上限 daily_max_ai_calls
+      - heavy 类功能额外受 daily_heavy_feature_calls 限制
+    """
+    from app.services.feature_flags import rate_tier
+
     s = get_settings()
     today = date.today().isoformat()
     usage = await ensure_daily_reset(user_id)
     override = await _get_user_quota_override(user_id)
+
+    tier = rate_tier(action)
+
+    # 重型功能单独计数
+    if tier == "heavy":
+        heavy_limit = override.get("daily_heavy_feature_calls") or s.daily_heavy_feature_calls
+        heavy_used = usage.get("heavy_calls_count", 0)
+        if heavy_used >= heavy_limit:
+            raise HTTPException(429, f"今日重型功能调用次数已达上限（{heavy_limit} 次），请明日再试。")
 
     base_limit = override.get("daily_ai_calls_limit") or s.daily_max_ai_calls
     effective_limit = base_limit + (usage.get("bonus_generations", 0) or 0)
@@ -134,13 +168,21 @@ async def check_daily_limits(user_id: int, action: str) -> dict:
 
 
 async def record_usage(user_id: int, action: str, credits_used: int = 0) -> None:
-    """记录一次 AI 调用。"""
+    """记录一次 AI 调用。
+
+    自动识别轻重等级：heavy 功能额外计入 heavy_calls_count。
+    """
+    from app.services.feature_flags import rate_tier
+
     today = date.today().isoformat()
     db = await get_db()
 
-    mv_increment = ", mv_count = mv_count + 1" if action == "mv" else ""
+    heavy_inc = ""
+    if rate_tier(action) == "heavy":
+        heavy_inc = ", heavy_calls_count = COALESCE(heavy_calls_count, 0) + 1"
+
     await db.execute(
-        f"UPDATE daily_usage SET ai_calls_count = ai_calls_count + 1 {mv_increment} WHERE user_id = ? AND usage_date = ?",
+        f"UPDATE daily_usage SET ai_calls_count = ai_calls_count + 1 {heavy_inc} WHERE user_id = ? AND usage_date = ?",
         (user_id, today),
     )
 
@@ -193,8 +235,8 @@ async def add_bonus_generation(user_id: int) -> None:
     today = date.today().isoformat()
     db = await get_db()
     await db.execute(
-        "INSERT INTO daily_usage (user_id, usage_date, ai_calls_count, credits_granted, credits_used, mv_count, bonus_generations) "
-        "VALUES (?, ?, 0, 0, 0, 0, 1) "
+        "INSERT INTO daily_usage (user_id, usage_date, ai_calls_count, credits_granted, credits_used, mv_count, heavy_calls_count, bonus_generations) "
+        "VALUES (?, ?, 0, 0, 0, 0, 0, 1) "
         "ON CONFLICT(user_id, usage_date) DO UPDATE SET bonus_generations = bonus_generations + 1",
         (user_id, today),
     )

@@ -7,11 +7,13 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.database import get_db
 from app.services.ai_scheduler import get_scheduler
+from app.services.feature_flags import require_feature
 
 router = APIRouter(prefix="/ai", tags=["ai-lyrics"])
 
 
 @router.post("/lyrics")
+@require_feature("ai_lyrics")
 async def generate_lyrics(req: dict, request: Request):
     """歌词生成 — 对接硅基 Qwen2.5-7B-Instruct，自动扣 1 Credits。"""
     user_id = req.get("user_id", 1)

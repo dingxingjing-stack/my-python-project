@@ -21,6 +21,7 @@ from app.database import get_db
 from app.services.ai_scheduler import get_scheduler
 from app.services.sovits_engine import get_sovits_engine
 from app.services.local_storage import get_local_storage
+from app.services.feature_flags import require_feature, is_enabled
 
 
 async def _separate_vocals(input_path: str, output_dir: str) -> tuple[str, str]:
@@ -63,13 +64,9 @@ async def remix_track(
     new_lyrics: str = Form(""),
     user_id: int = Form(1),
 ):
-    """上传音频进行二创改编。
-
-    Args:
-        audio: 上传的本地音频文件
-        style: 目标曲风
-        new_lyrics: 新歌词（可选，不传则由 AI 重写）
-    """
+    """上传音频进行二创改编。"""
+    if not is_enabled("remix"):
+        raise HTTPException(503, "功能暂未开放")
     scheduler = get_scheduler()
     sovits = get_sovits_engine()
     job_id = str(uuid.uuid4())[:8]

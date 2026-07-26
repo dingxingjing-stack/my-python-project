@@ -205,6 +205,7 @@ async def admin_list_users(
 class QuotaOverride(BaseModel):
     daily_ai_calls_limit: Optional[int] = None
     daily_mv_limit: Optional[int] = None
+    daily_heavy_feature_calls: Optional[int] = None
 
 
 @router.post("/users/{user_id}/quota")
@@ -212,14 +213,15 @@ async def admin_set_user_quota(user_id: int, body: QuotaOverride):
     """设置用户每日限额覆盖。"""
     db = await get_db()
     await db.execute(
-        """INSERT INTO user_quota_overrides (user_id, daily_ai_calls_limit, daily_mv_limit, updated_at, updated_by)
-           VALUES (?, ?, ?, datetime('now'), 1)
+        """INSERT INTO user_quota_overrides (user_id, daily_ai_calls_limit, daily_mv_limit, daily_heavy_feature_calls, updated_at, updated_by)
+           VALUES (?, ?, ?, ?, datetime('now'), 1)
            ON CONFLICT(user_id) DO UPDATE SET
                daily_ai_calls_limit = COALESCE(?, daily_ai_calls_limit),
                daily_mv_limit = COALESCE(?, daily_mv_limit),
+               daily_heavy_feature_calls = COALESCE(?, daily_heavy_feature_calls),
                updated_at = datetime('now')""",
-        (user_id, body.daily_ai_calls_limit, body.daily_mv_limit,
-         body.daily_ai_calls_limit, body.daily_mv_limit),
+        (user_id, body.daily_ai_calls_limit, body.daily_mv_limit, body.daily_heavy_feature_calls,
+         body.daily_ai_calls_limit, body.daily_mv_limit, body.daily_heavy_feature_calls),
     )
     await db.commit()
     return {"success": True}

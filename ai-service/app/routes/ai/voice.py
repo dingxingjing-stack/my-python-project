@@ -5,11 +5,13 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from app.database import get_db
 from app.services.sovits_engine import get_sovits_engine
+from app.services.feature_flags import require_feature, is_enabled
 
 router = APIRouter(prefix="/ai", tags=["ai-voice"])
 
 
 @router.post("/voice/generate")
+@require_feature("voice_clone")
 async def generate_vocal(
     text: str = Form(...),
     voice: str = Form("default"),
@@ -17,6 +19,8 @@ async def generate_vocal(
     language: str = Form("zh"),
 ):
     """文本转人声干声。"""
+    if not is_enabled("voice_clone"):
+        raise HTTPException(503, "功能暂未开放")
     engine = get_sovits_engine()
     try:
         audio_url = await engine.generate_vocal(
@@ -34,6 +38,8 @@ async def train_voice(
     transcript: str = Form(""),
 ):
     """上传音频样本训练新音色。"""
+    if not is_enabled("voice_clone"):
+        raise HTTPException(503, "功能暂未开放")
     engine = get_sovits_engine()
     from app.services.local_storage import get_local_storage
     storage = get_local_storage()
