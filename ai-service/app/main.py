@@ -142,9 +142,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    import pathlib
+    _static_dir = str(pathlib.Path(__file__).resolve().parent / "static")
     app.mount(
         "/static",
-        StaticFiles(directory="app/static", html=True),
+        StaticFiles(directory=_static_dir, html=True),
         name="static",
     )
 
@@ -257,29 +259,13 @@ def _register_routers(app: FastAPI) -> None:
         from app.services.feature_flags import features_summary
         return features_summary()
 
-    # ── 根路径 — 渲染企业官网首页 ──
-    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    async def root():
+    # ── 静态页面路由 (Jinja2 模板优先，FileResponse 兜底) ──
+    # 如果 Jinja2 渲染失败，静态文件可直出
+    @app.get("/static/fallback.html", include_in_schema=False)
+    async def static_home():
         import pathlib
         home_path = pathlib.Path(__file__).resolve().parent / "static" / "home.html"
-        return FileResponse(str(home_path))
-
-    @app.head("/", include_in_schema=False)
-    async def root_head():
-        return JSONResponse(content=None)
-
-    # ── 登录/注册页面 (静态文件) ──
-    @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
-    async def login_page():
-        import pathlib
-        login_path = pathlib.Path(__file__).resolve().parent / "static" / "login.html"
-        return FileResponse(str(login_path))
-
-    @app.get("/register", response_class=HTMLResponse, include_in_schema=False)
-    async def register_page():
-        import pathlib
-        reg_path = pathlib.Path(__file__).resolve().parent / "static" / "register.html"
-        return FileResponse(str(reg_path))
+        return FileResponse(str(home_path), media_type="text/html; charset=utf-8")
 
 
 # Singleton
