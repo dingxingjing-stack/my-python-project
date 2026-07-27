@@ -86,3 +86,46 @@
 - `llm_client.py` 是旧版客户端，仍有其他路由引用但已重写适配新配置
 - 启动 server 需指定 `--log-level info` 以使用日志过滤器
 - `data/*.db` / `*.db-wal` / `*.db-shm` 已加入 `.gitignore`
+
+---
+
+## 会话记录 (2026-07-26)
+
+### 已完成工作
+
+#### 1. Render 部署修复 — 根路由返回 HTML 而非 JSON
+- **问题**: Render 部署返回 `"Inference Service API v3.0.0"` JSON（完全不同的旧代码），非项目代码
+- **根本原因**: `render.yaml` 放在 `ai-service/` 子目录，Render 找不到它，导致使用了错误的构建配置
+- **解决**:
+  - 将 `render.yaml` 从 `ai-service/` 移到仓库根目录
+  - 添加 `rootDir: ai-service` 确保构建在正确子目录下运行
+  - `main.py:262` 根路由改用 `with open("static/home.html")` 渲染 HTML
+  - 新增 `/console`、`/login`、`/register` 路由读取对应静态 HTML
+  - 移除 `pages.py` 中重复的根路由定义
+- **状态**: Render 仍返回旧代码 JSON，需用户在 Render Dashboard 检查仓库绑定和手动触发部署
+
+#### 2. 创建独立前端 `ai-music-beta/` — Vue3 + Vite + Tailwind CSS
+- 公测专用 AI 音乐生成单页网站，适配电脑+手机
+- **项目位置**: `C:\Users\dingx\Desktop\music-website-skill-backup\ai-music-beta\`
+- **6 个组件**:
+  - `NavBar.vue` — 悬浮导航 + 公测横幅 + 滚动磨砂玻璃效果
+  - `HeroSection.vue` — Canvas 粒子背景 + 打字机标题 + 渐变光晕
+  - `GeneratorSection.vue` — 提示词输入(500字限制) + 10种曲风选择 + 时长滑块(15-180s) + 加载脉冲动画
+  - `PlayerSection.vue` — Canvas 实时波形频谱 + 播放/暂停/进度条 + MP3 下载
+  - `BetaInfoSection.vue` — 3 项额度统计卡 + 5 条使用须知 + 6 项 FAQ 折叠面板
+  - `SiteFooter.vue` — Beta 0.1 版本号 + 版权 + 隐私/服务条款/API 文档链接
+- **后端对接**: `POST /api/v1/ai/generate`（实际后端端点与用户提供的 `/api/v1/music/run` 不同，已验证修正）
+- **构建产物**: JS 85KB / CSS 33KB（gzip ~39KB）
+- **部署文档**: `CLOUDFLARE_DEPLOY.md` — Cloudflare Pages 部署步骤
+
+#### 3. 后端静态文件补全
+- 创建 `ai-service/static/navbar.html` 可复用导航栏组件
+- 创建 `ai-service/static/js/app.js` 全局语言加载 + Alpine 上下文工厂
+- `main.py` 挂载 `directory="static"`（相对路径指向 `ai-service/static/`）
+
+### 待办/未完成
+1. **Render 部署修复** — 已推送到 GitHub（`c29b0dc`），但 Render 仍显示旧代码。需用户：
+   - 在 Render Dashboard 检查仓库绑定是否为 `dingxingjing-stack/my-python-project`
+   - 手动触发 "Deploy latest commit"
+2. **`ai-music-beta/` 部署** — 建议推送到 GitHub 后通过 Cloudflare Pages 部署
+3. **已删除 `ai-service/render.yaml`**（移到仓库根目录）
