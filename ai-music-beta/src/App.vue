@@ -7,7 +7,7 @@ import PlayerSection from './components/PlayerSection.vue'
 import BetaInfoSection from './components/BetaInfoSection.vue'
 import SiteFooter from './components/SiteFooter.vue'
 
-const API_BASE = 'https://ai-music-backend-db6h.onrender.com'
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://ai-music-backend-db6h.onrender.com'
 const audioUrl = ref(null)
 const isGenerating = ref(false)
 

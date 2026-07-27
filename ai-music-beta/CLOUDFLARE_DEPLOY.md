@@ -19,9 +19,14 @@
    - **构建命令**: `npm run build`
    - **构建输出目录**: `dist`
 
-5. 点击 **Save and Deploy**
+5. **配置环境变量**（选做）：
+   在 Cloudflare Pages 项目 → **Settings** → **Environment variables** → 添加：
+   - `VITE_API_BASE` = `https://ai-music-backend-db6h.onrender.com`
+   - 如不需改动则可跳过，代码已内置默认值
 
-6. 等待部署完成（约 1-2 分钟），Cloudflare 会自动分配域名如 `avireon-beta.pages.dev`
+6. 点击 **Save and Deploy**
+
+7. 等待部署完成（约 1-2 分钟），Cloudflare 会自动分配域名如 `avireon-beta.pages.dev`
 
 ## 自定义域名（可选）
 
