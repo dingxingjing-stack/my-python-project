@@ -129,3 +129,20 @@
    - 手动触发 "Deploy latest commit"
 2. **`ai-music-beta/` 部署** — 建议推送到 GitHub 后通过 Cloudflare Pages 部署
 3. **已删除 `ai-service/render.yaml`**（移到仓库根目录）
+
+---
+
+## 会话记录 (2026-07-27)
+
+### 已完成工作
+
+#### 1. 查询仓库 `gustavonline/pi-desktop` 根目录结构
+- **结果**: 根目录**不存在** `backend` 文件夹
+- **项目类型确认**: 该仓库是 **Tauri 桌面应用**（src-tauri/ + vite.config.ts + package.json），不含 Python FastAPI 后端代码
+- **结论**: 不适合直接部署到 Render Web Service，部署方式应为生成安装包分发
+
+### 待办/未完成
+1. **Render 服务绑定的仓库问题**: Render 服务 `ai-music-backend` 当前绑定的是 `dingxingjing-stack/music-video-platform`（含 `backend/`），而非 `my-python-project`。需用户明确目标：
+   - 如果要将 `my-python-project` 部署到 Render，需在 Dashboard 切换 Source 仓库
+   - 如果要部署 `gustavonline/pi-desktop`（Tauri 项目），Render 不适用
+2. **Render 部署修复** (延续 07-26): 仍被阻塞，需用户确认下一步操作

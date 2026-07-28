@@ -1,6 +1,6 @@
 # Web framework
 fastapi==0.115.6
-uvicorn[standard]==0.34.0
+uvicorn==0.34.0
 python-multipart==0.0.20
 
 # Jinja2 templates (FastAPI built-in support)
@@ -12,7 +12,8 @@ jinja2==3.1.4
 httpx==0.28.1
 
 # Settings
-pydantic==2.10.4
+pydantic==2.13.4
+pydantic-core>=2.46.4
 pydantic-settings==2.7.1
 
 # Database (SQLite + async driver)
@@ -43,3 +44,9 @@ slowapi==0.1.9
 # Utils
 python-dotenv==1.0.1
 tenacity==9.0.0
+
+# Render Python 3.14 wheel compatibility:
+# - pydantic upgraded 2.10.4 -> 2.13.4 (unlocks pydantic-core >= 2.46.4 with cp314 wheel)
+# - pydantic-core explicit pin >= 2.46.4 (first version shipping manylinux cp314 wheel)
+# - uvicorn[standard] -> uvicorn (drops httptools, no cp314 wheel on free tier)
+# This eliminates all maturin / Rust Cargo source compilation on Render.
