@@ -50,3 +50,5 @@ tenacity==9.0.0
 # - pydantic-core explicit pin >= 2.46.4 (first version shipping manylinux cp314 wheel)
 # - uvicorn[standard] -> uvicorn (drops httptools, no cp314 wheel on free tier)
 # This eliminates all maturin / Rust Cargo source compilation on Render.
+
+gunicorn==20.1.0
