@@ -51,4 +51,5 @@ tenacity==9.0.0
 # - uvicorn[standard] -> uvicorn (drops httptools, no cp314 wheel on free tier)
 # This eliminates all maturin / Rust Cargo source compilation on Render.
 
+setuptools==68.0.0
 gunicorn==20.1.0
