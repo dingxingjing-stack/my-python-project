@@ -146,3 +146,39 @@
    - 如果要将 `my-python-project` 部署到 Render，需在 Dashboard 切换 Source 仓库
    - 如果要部署 `gustavonline/pi-desktop`（Tauri 项目），Render 不适用
 2. **Render 部署修复** (延续 07-26): 仍被阻塞，需用户确认下一步操作
+
+---
+
+## 会话记录 (2026-07-28)
+
+### 已完成工作
+
+#### 1. 修复 Render 部署 `ModuleNotFoundError: No module named 'main'`
+- **问题**: Gunicorn 启动命令 `gunicorn main:app` 找不到模块，因为 FastAPI 入口在 `ai-service/app/main.py`
+- **根本原因**: `get_app()` 工厂模式在 `ai-service/app/main.py` 末尾导出 `app = get_app()`，模块路径应为 `ai-service.app.main:app`
+- **解决**:
+  - 分析 `main.py:299-300` 定位 `app = get_app()` 导出位置
+  - 确认正确 gunicorn 模块路径为 `ai-service.app.main:app`
+  - 向用户提供 Render Start Command 修正方案
+
+#### 2. 后端依赖补全 (`ai-service/requirements.txt`)
+- 新增 `gunicorn==20.1.0` — 解决 `gunicorn: command not found`
+- 新增 `setuptools==68.0.0` — 解决 `ModuleNotFoundError: No module named 'pkg_resources'`（需在 gunicorn 之前安装）
+- 构建命令使用 `pip install --only-binary=:all: -r requirements.txt` 跳过编译
+
+#### 3. 前端 `ai-music-beta/` 构建验证
+- `npm run dev` 正常启动，无报错
+- `npm run build` 成功，vendor 分包（echarts/vue等独立 chunk）、sourcemap 关闭
+
+### 当前 Git 状态
+- 最新提交: au 需用户确认后推送
+- 工作目录包含未提交的 `requirements.txt` 变更
+
+### 待办/未完成
+1. **Render 启动命令更新** — 用户需在 Render Dashboard 将 Start Command 改为：
+   ```
+   gunicorn -k uvicorn.workers.UvicornWorker --workers 2 --bind 0.0.0.0:$PORT ai-service.app.main:app
+   ```
+   然后点击 Manual Deploy → Deploy latest commit
+2. **Render 仓库绑定确认** — 需用户检查 `ai-music-backend` 服务绑定的仓库是否为 `dingxingjing-stack/my-python-project`
+3. **`requirements.txt` 推送** — 用户需手动 `git add`、`git commit`、`git push` 以同步变更
