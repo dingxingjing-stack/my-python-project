@@ -24,12 +24,12 @@
           var dict = this.translations && this.translations[this.lang];
           return (dict && dict[key]) ? dict[key] : key;
         },
-        setLang: function(l) {
+setLang: function(l) {
           this.lang = l;
           try { localStorage.setItem('lang', l); } catch(e) {}
           document.cookie = 'lang=' + l + ';path=/;max-age=' + 365*86400;
           document.documentElement.lang = l;
-          fetch('/api/v1/lang/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({locale:l}) }).catch(function(){});
+          setTimeout(function() { window.location.reload(); }, 100);
         },
         logout: function() {
           try { localStorage.removeItem('token'); localStorage.removeItem('user'); } catch(e) {}

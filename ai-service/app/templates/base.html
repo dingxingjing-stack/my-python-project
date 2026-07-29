@@ -26,7 +26,7 @@
           this.lang = l;
           localStorage.setItem('lang', l);
           document.cookie = 'lang=' + l + ';path=/;max-age=' + 365*86400;
-          document.documentElement.lang = l;
+          setTimeout(function() { window.location.reload(); }, 100);
         },
         logout() {
           localStorage.removeItem('token');

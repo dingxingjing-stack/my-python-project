@@ -21,10 +21,11 @@
           const dict = this.translations[this.lang];
           return dict && dict[key] ? dict[key] : key;
         },
-        setLang(l) {
+setLang(l) {
           this.lang = l;
           localStorage.setItem('lang', l);
           document.cookie = 'lang=' + l + ';path=/;max-age=' + 365*86400;
+          setTimeout(function() { window.location.reload(); }, 100);
         },
         navTitle() {
           const titles = { music: 'Music Generation', lyrics: 'Lyrics Creation', tts: 'Voice Synthesis', mv: 'MV Production', tasks: 'Task Records', settings: 'Account Settings' };

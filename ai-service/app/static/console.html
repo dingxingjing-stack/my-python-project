@@ -28,7 +28,8 @@
           this.lang = l;
           try { localStorage.setItem('lang', l); } catch(e) {}
           document.cookie = 'lang=' + l + ';path=/;max-age=' + 365*86400;
-          fetch('/api/v1/lang/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({locale:l}) }).catch(function(){});
+          document.documentElement.lang = l;
+          setTimeout(function() { window.location.reload(); }, 100);
         },
         navTitle: function() {
           var titles = { music: 'Music Generation', lyrics: 'Lyrics Creation', tts: 'Voice Synthesis', mv: 'MV Production', tasks: 'Task Records', settings: 'Account Settings' };
