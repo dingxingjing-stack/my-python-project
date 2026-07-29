@@ -14,8 +14,9 @@ router = APIRouter(prefix="/ai", tags=["ai-lyrics"])
 
 @router.post("/lyrics")
 @require_feature("ai_lyrics")
-async def generate_lyrics(req: dict, request: Request):
+async def generate_lyrics(request: Request):
     """歌词生成 — 对接硅基 Qwen2.5-7B-Instruct，自动扣 1 Credits。"""
+    req = await request.json()
     user_id = req.get("user_id", 1)
     prompt = req.get("prompt", "")
     style = req.get("style", "pop")

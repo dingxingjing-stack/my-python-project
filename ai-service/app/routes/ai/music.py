@@ -11,7 +11,9 @@ from __future__ import annotations
 import os
 import uuid
 import random
-from typing import Optional
+import asyncio
+import json
+from typing import Optional, Dict, Any
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -25,6 +27,26 @@ router = APIRouter(prefix="/ai", tags=["ai-music"])
 
 HF_FALLBACK_ENABLED = os.getenv("HF_FALLBACK", "true").lower() in ("1", "true", "yes")
 MOCK_FALLBACK_ENABLED = os.getenv("MOCK_FALLBACK", "true").lower() in ("1", "true", "yes")
+
+# ── 全局单例 ──
+_http_client: Optional[httpx.AsyncClient] = None
+
+# ── 简易内存任务存储（用于前端轮询） ──
+_job_store: Dict[str, Dict[str, Any]] = {}
+
+def _create_job(result: Dict[str, Any]) -> str:
+    """创建任务并返回 job_id"""
+    job_id = uuid.uuid4().hex[:8]
+    _job_store[job_id] = {
+        "status": "completed",
+        "result": result,
+        "progress": 100,
+    }
+    return job_id
+
+def _get_job(job_id: str) -> Optional[Dict[str, Any]]:
+    """获取任务状态"""
+    return _job_store.get(job_id)
 
 # ── 全局单例 ──
 _http_client: Optional[httpx.AsyncClient] = None
@@ -123,40 +145,59 @@ class GenerateResponse(BaseModel):
     agnes_debug: Optional[str] = None
 
 
-@router.post("/generate", response_model=GenerateResponse)
+class JobSubmitResponse(BaseModel):
+    job_id: str
+    status: str = "queued"
+
+
+@router.post("/generate")
 @require_feature("ai_music")
 async def generate_music(request: GenerateRequest):
+    # 1) 先创建任务，返回 job_id 供前端轮询
+    job_id = uuid.uuid4().hex[:8]
+    _job_store[job_id] = {"status": "queued", "progress": 0, "result": None, "error": None}
+    
+    # 后台异步跑生成，避免阻塞返回
+    asyncio.create_task(_run_generation(job_id, request))
+    
+    return {"job_id": job_id}
+
+async def _run_generation(job_id: str, request: GenerateRequest):
+    """后台任务：真正跑生成流程，完成后写入 _job_store"""
     try:
-        # 第 8 项：统一 strip 入参，消除空白字符残留
+        # 更新状态
+        _job_store[job_id]["status"] = "processing"
+        _job_store[job_id]["progress"] = 10
+        
         prompt = request.prompt.strip()
         if len(prompt) < 5:
             raise HTTPException(status_code=400, detail="提示词至少需要 5 个字符")
 
-        # 第 5 项：task_id 增加随机 uuid 短后缀，避免碰撞
         task_suffix = uuid.uuid4().hex[:6]
 
         # ── 第 1 层：Agnes 优化提示词 / 生成歌词 ──
         print("[generate] 第 1 层: Agnes 优化提示词...")
         agnes_request = AgnesSongRequest(
-            prompt=prompt,
+            prompt=request.prompt.strip(),
             style=request.style,
             duration=request.duration or 180,
             type=request.type,
         )
         agnes_result = await agnes_service.generate_song(agnes_request)
 
-        ai_provider = "agnes" if agnes_result.optimized_prompt and agnes_result.optimized_prompt != prompt else "gemini"
+        ai_provider = "agnes" if agnes_result.optimized_prompt and agnes_result.optimized_prompt != request.prompt.strip() else "gemini"
         agnes_debug = (
             f"success={agnes_result.success}, "
-            f"opt_changed={'yes' if agnes_result.optimized_prompt != prompt else 'no'}, "
+            f"opt_changed={'yes' if agnes_result.optimized_prompt != request.prompt.strip() else 'no'}, "
             f"error={agnes_result.error}, "
             f"key_set={bool(agnes_service.API_KEY)}"
         )
 
-        # 第 8 项：final_prompt 也做 strip 清洗
-        final_prompt = (agnes_result.optimized_prompt or prompt).strip()
+        final_prompt = (agnes_result.optimized_prompt or request.prompt.strip()).strip()
         if agnes_result.generated_lyrics:
             final_prompt = agnes_result.generated_lyrics.strip()
+
+        _job_store[job_id]["progress"] = 30
 
         # ── 第 2 层：Mureka 生成音频 ──
         print("[generate] 第 2 层: Mureka 生成音频...")
@@ -165,16 +206,19 @@ async def generate_music(request: GenerateRequest):
             style=request.style,
             duration=request.duration,
         )
+        _job_store[job_id]["progress"] = 50
         try:
             mureka_result = await mureka_service.generate_song(mureka_request)
             if mureka_result.success:
-                return GenerateResponse(
-                    success=True,
-                    audio_url=mureka_result.audio_url,
-                    task_id=mureka_result.task_id,
-                    ai_provider=f"{ai_provider}+mureka",
-                    agnes_debug=agnes_debug,
-                )
+                result = {
+                    "success": True,
+                    "audio_url": mureka_result.audio_url,
+                    "task_id": mureka_result.task_id,
+                    "ai_provider": f"{ai_provider}+mureka",
+                    "agnes_debug": agnes_debug,
+                }
+                _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
+                return
         except QuotaExceededError:
             print("[generate] 第 2 层失败: Mureka 配额耗尽 → 降级到第 3 层 HF")
         except Exception as e:
@@ -184,50 +228,83 @@ async def generate_music(request: GenerateRequest):
         print("[generate] 第 3 层: HF MusicGen 兜底...")
         hf_audio = _try_hf_fallback(prompt=final_prompt, duration=request.duration)
         if hf_audio:
-            return GenerateResponse(
-                success=True,
-                audio_url=hf_audio,
-                task_id=f"hf-{hash(final_prompt) & 0xffffff:06x}-{task_suffix}",
-                ai_provider=f"{ai_provider}+hf",
-                agnes_debug=agnes_debug,
-            )
+            result = {
+                "success": True,
+                "audio_url": hf_audio,
+                "task_id": f"hf-{hash(final_prompt) & 0xffffff:06x}-{uuid.uuid4().hex[:6]}",
+                "ai_provider": f"{ai_provider}+hf",
+                "agnes_debug": agnes_debug,
+            }
+            _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
+            return
 
-        # ── 第 4 层：Mock 示例音频兜底 ──
+        # 第 4 层：Mock 示例音频兜底
         if not MOCK_FALLBACK_ENABLED:
-            print("[generate] 第 4 层: 所有引擎失败，MOCK_FALLBACK 未启用，返回错误")
-            return GenerateResponse(
-                success=False,
-                error="所有 AI 引擎均不可用，且 MOCK 已被关闭",
-                ai_provider="none",
-                agnes_debug=agnes_debug,
-            )
+            _job_store[job_id] = {"status": "failed", "progress": 100, "result": None, "error": "所有 AI 引擎均不可用，且 MOCK 已被关闭"}
+            return
 
-        print("[generate] 第 4 层: Mock 示例音频兜底")
         mock_urls = [
             "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
             "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
             "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
         ]
-        return GenerateResponse(
-            success=True,
-            audio_url=random.choice(mock_urls),
-            task_id=f"mock-{hash(prompt) & 0xffffff:06x}-{task_suffix}",
-            ai_provider=f"{ai_provider}+mock",
-            agnes_debug=agnes_debug,
-        )
+        result = {
+            "success": True,
+            "audio_url": random.choice(mock_urls),
+            "task_id": f"mock-{hash(prompt) & 0xffffff:06x}-{uuid.uuid4().hex[:6]}",
+            "ai_provider": f"{ai_provider}+mock",
+            "agnes_debug": agnes_debug,
+        }
+        _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
 
     except HTTPException:
-        raise
+        _job_store[job_id] = {"status": "failed", "progress": 100, "result": None, "error": "HTTP Exception"}
     except Exception as e:
         import traceback
         print(f"[generate 未捕获] {type(e).__name__}: {e}")
         traceback.print_exc()
-        return GenerateResponse(
-            success=False,
-            error=f"{type(e).__name__}: {e}",
-            ai_provider="error",
-            agnes_debug="",
-        )
+        _job_store[job_id] = {"status": "failed", "progress": 100, "result": None, "error": f"{type(e).__name__}: {e}"}
+
+
+@router.get("/job/{job_id}")
+
+@router.get("/job/{job_id}")
+async def get_job_status(job_id: str):
+    """查询生成任务状态 — 前端轮询用"""
+    from app.services.task_state_machine import get_task
+    
+    task = await get_task(job_id)
+    if not task:
+        return {
+            "job_id": job_id,
+            "status": "not_found",
+            "progress": 0,
+            "error": "任务不存在"
+        }
+    
+    status = task["status"]
+    progress_map = {
+        "queued": 10,
+        "processing": 50,
+        "completed": 100,
+        "failed": 100,
+        "cancelled": 100,
+    }
+    
+    result = None
+    if status == "completed":
+        try:
+            result = json.loads(task.get("output", "{}"))
+        except:
+            result = {"audio_url": task.get("output", "")}
+    
+    return {
+        "job_id": job_id,
+        "status": status,
+        "progress": progress_map.get(status, 0),
+        "result": result,
+        "error": task.get("error"),
+    }
 
 
 @router.get("/styles")

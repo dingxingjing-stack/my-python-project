@@ -14,8 +14,9 @@ router = APIRouter(prefix="/ai", tags=["ai-cover"])
 
 @router.post("/cover/generate")
 @require_feature("ai_cover")
-async def generate_cover(req: dict, request: Request):
+async def generate_cover(request: Request):
     """封面图生成 — 调用 OpenRouter 视觉模型生成绘图提示词，扣 2 Credits。"""
+    req = await request.json()
     user_id = req.get("user_id", 1)
     lyrics_id = req.get("lyrics_id")
     lyrics = req.get("lyrics", "")

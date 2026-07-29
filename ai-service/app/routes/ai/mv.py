@@ -29,8 +29,9 @@ router = APIRouter(prefix="/ai", tags=["ai-mv"])
 
 @router.post("/mv/generate")
 @require_feature("ai_mv_advanced")
-async def generate_mv_full(req: dict):
+async def generate_mv_full(request: Request):
     """MV 全流程生成 — 分镜→生图→动态→合成，扣 20 Credits。"""
+    req = await request.json()
     user_id = req.get("user_id", 1)
     lyrics = req.get("lyrics", "")
     title = req.get("title", "Untitled")
@@ -82,8 +83,9 @@ async def generate_mv_full(req: dict):
 
 
 @router.post("/mv/regenerate-scene")
-async def regenerate_scene(req: dict):
+async def regenerate_scene(request: Request):
     """单场景重新生成。"""
+    req = await request.json()
     user_id = req.get("user_id", 1)
     video_id = req.get("video_id")
     scene_index = req.get("scene_index", 0)
