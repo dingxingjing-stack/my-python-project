@@ -43,7 +43,8 @@
           fetch('/api/v1/lang/translations').then(function(r){return r.json();}).then(function(d){
             self.translations = d;
           }).catch(function(){});
-        }
+        },
+        goToCreate: function() { window.location.href = '/create'; }
       };
     }
   </script>
@@ -155,22 +156,22 @@
         <p class="text-lg text-gray-500 max-w-xl mx-auto" x-text="t('Four core AI-powered tools available now. Professional production tools coming in subsequent phases.')">Four core AI-powered tools available now. Professional production tools coming in subsequent phases.</p>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm cursor-pointer hover:shadow-md" @click="goToCreate">
           <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">🎵</div>
           <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('AI Music Generation')">AI Music Generation</h3>
           <p class="text-sm text-gray-500 leading-relaxed" x-text="t('Describe your song. AI generates complete music with vocals in minutes.')">Describe your song. AI generates complete music with vocals in minutes.</p>
         </div>
-        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm cursor-pointer hover:shadow-md" @click="goToCreate">
           <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">📝</div>
           <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('Lyrics Creation')">Lyrics Creation</h3>
           <p class="text-sm text-gray-500 leading-relaxed" x-text="t('AI writes lyrics in any style and language. Generate verses, chorus, and LRC format.')">AI writes lyrics in any style and language. Generate verses, chorus, and LRC format.</p>
         </div>
-        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm cursor-pointer hover:shadow-md" @click="goToCreate">
           <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">🔊</div>
           <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('Voice Synthesis')">Voice Synthesis</h3>
           <p class="text-sm text-gray-500 leading-relaxed" x-text="t('Convert text to natural speech. Multiple voice options and languages supported.')">Convert text to natural speech. Multiple voice options and languages supported.</p>
         </div>
-        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+        <div class="feature-card p-6 rounded-xl bg-white border border-gray-200 shadow-sm cursor-pointer hover:shadow-md" @click="goToCreate">
           <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-xl mb-4">🎬</div>
           <h3 class="text-base font-semibold text-gray-900 mb-2" x-text="t('MV Generation')">MV Generation</h3>
           <p class="text-sm text-gray-500 leading-relaxed" x-text="t('Auto-generate music videos from your songs. Multiple visual styles available.')">Auto-generate music videos from your songs. Multiple visual styles available.</p>
