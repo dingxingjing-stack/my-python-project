@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.database import get_db
 from app.services.ai_scheduler import get_scheduler
