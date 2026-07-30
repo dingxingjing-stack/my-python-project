@@ -249,15 +249,6 @@ def require_feature(feature: str) -> Callable:
                 )
             return await func(*args, **kwargs)
 
-        # 跳过 Request 类型的参数 — FastAPI 会特殊注入，不应出现在签名中
-        # 否则 FastAPI 会把它误判为 query 参数导致 422
-        from starlette.requests import Request as _StarletteRequest
-        filtered_params = {
-            name: p for name, p in sig.parameters.items()
-            if hints.get(name) is not _StarletteRequest
-        }
-        wrapper.__annotations__ = hints
-        wrapper.__signature__ = sig.replace(parameters=list(filtered_params.values()))
         return wrapper
     return decorator
 
