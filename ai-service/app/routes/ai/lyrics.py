@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from fastapi import APIRouter, HTTPException, Request
 
@@ -10,6 +11,8 @@ from app.services.ai_scheduler import get_scheduler
 from app.services.feature_flags import require_feature
 
 router = APIRouter(prefix="/ai", tags=["ai-lyrics"])
+
+MOCK_FALLBACK_ENABLED = os.getenv("MOCK_FALLBACK", "true").lower() in ("1", "true", "yes")
 
 
 @router.post("/lyrics")
@@ -40,7 +43,34 @@ async def generate_lyrics(request: Request):
             user_id=user_id,
         )
     except Exception as exc:
-        raise HTTPException(500, f"AI generation failed: {exc}")
+        print(f"[lyrics] AI generation failed: {exc}")
+        if not MOCK_FALLBACK_ENABLED:
+            raise HTTPException(500, f"AI generation failed: {exc}")
+        # Mock 兜底 — 返回模板歌词让前端流程能跑通
+        mock_text = _build_mock_lyrics(prompt, style, language)
+        db = await get_db()
+        cur = await db.execute(
+            """
+            INSERT INTO lyrics (creation_id, user_id, version, title, lyrics_text, lrc_text, prompt_text, style_tags, language, model_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (creation_id, user_id, 1, f"[Mock] {prompt[:20]}",
+             mock_text, "", prompt, style, language, "mock"),
+        )
+        await db.commit()
+        return {
+            "success": True,
+            "data": {
+                "lyrics_id": cur.lastrowid,
+                "version": 1,
+                "title": f"[Mock] {prompt[:20]}",
+                "lyrics": mock_text,
+                "lrc": "",
+                "model": "mock",
+                "provider": "mock",
+                "elapsed_ms": 0,
+            },
+        }
 
     # 解析 AI 返回的歌词结构
     parsed = _parse_lyrics(result.text)
@@ -128,3 +158,69 @@ def _parse_lyrics(text: str) -> dict:
         result["lrc"] = lrc_match.group(1).strip()
 
     return result
+
+
+def _build_mock_lyrics(prompt: str, style: str, language: str) -> str:
+    """生成 Mock 歌词（AI 不可用时兜底）。"""
+    is_zh = language.startswith("zh")
+    title = prompt[:20] if prompt else "Untitled"
+    if is_zh:
+        return f"""Title: {title}
+
+Verse 1:
+星光落在窗前
+夜色温柔如水
+心中那首歌谣
+随风轻轻飘远
+
+Chorus:
+追梦的人永不疲倦
+穿越风雨也从容
+我们都在路上
+奔向心中的光
+
+Verse 2:
+回忆变成诗句
+写下每个瞬间
+时间不会停歇
+但爱永远年轻
+
+Bridge:
+走过四季变迁
+依然相信明天
+心中的火焰
+从未熄灭过
+
+Chorus:
+追梦的人永不疲倦
+穿越风雨也从容
+我们都在路上
+奔向心中的光
+
+LRC:
+[00:00.00]星光落在窗前
+[00:05.00]夜色温柔如水
+[00:10.00]心中那首歌谣
+[00:15.00]随风轻轻飘远
+[00:20.00]追梦的人永不疲倦
+[00:25.00]穿越风雨也从容"""
+    else:
+        return f"""Title: {title}
+
+Verse 1:
+Starlight falls upon the window
+Night is gentle as the water
+The song inside my heart
+Drifts away with the wind
+
+Chorus:
+Dreamers never tire
+Walking through the storm with grace
+We are all on the road
+Running to the light within
+
+LRC:
+[00:00.00]Starlight falls upon the window
+[00:05.00]Night is gentle as the water
+[00:10.00]The song inside my heart
+[00:15.00]Drifts away with the wind"""
