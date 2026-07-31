@@ -33,7 +33,7 @@ import os
 from functools import wraps
 from typing import Awaitable, Callable, Optional
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from loguru import logger
 
 from app.config import get_settings
