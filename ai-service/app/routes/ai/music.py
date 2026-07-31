@@ -68,7 +68,7 @@ def _get_cdn_uploader():
     return _cdn_uploader
 
 
-def _try_hf_fallback(prompt: str, duration: Optional[int]) -> Optional[str]:
+async def _try_hf_fallback(prompt: str, duration: Optional[int]) -> Optional[str]:
     """
     尝试调用 Hugging Face Inference API 的 facebook/musicgen-large 模型生成音频。
 
@@ -92,7 +92,7 @@ def _try_hf_fallback(prompt: str, duration: Optional[int]) -> Optional[str]:
             payload["parameters"] = {"max_new_tokens": int(duration * 50)}
 
         client = _get_http_client()
-        response = client.post(api_url, headers=headers, json=payload)
+        response = await client.post(api_url, headers=headers, json=payload)
 
         if response.status_code != 200:
             truncated = response.text[:200]
@@ -226,7 +226,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
 
         # ── 第 3 层：HF MusicGen 兜底 ──
         print("[generate] 第 3 层: HF MusicGen 兜底...")
-        hf_audio = _try_hf_fallback(prompt=final_prompt, duration=request.duration)
+        hf_audio = await _try_hf_fallback(prompt=final_prompt, duration=request.duration)
         if hf_audio:
             result = {
                 "success": True,

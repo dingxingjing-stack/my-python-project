@@ -182,3 +182,162 @@
    然后点击 Manual Deploy → Deploy latest commit
 2. **Render 仓库绑定确认** — 需用户检查 `ai-music-backend` 服务绑定的仓库是否为 `dingxingjing-stack/my-python-project`
 3. **`requirements.txt` 推送** — 用户需手动 `git add`、`git commit`、`git push` 以同步变更
+
+---
+
+## 会话记录 (2026-07-29)
+
+### 已完成工作
+
+#### 1. 修复 4 个 AI 路由 JSON body 解析失败 (422 错误)
+- **问题**: `/api/v1/ai/lyrics`、`/cover`、`/mv`（2个路由）在 Render 部署后全部返回 422，前端无法使用
+- **根本原因**: 4 个路由的 handler 写成 `async def func(req: dict, request: Request):`，FastAPI 无法正确解析 `req: dict` 参数
+- **解决**: 统一改为 `async def func(request: Request):` + `req = await request.json()`，手动从请求体中解析 JSON
+- **涉及文件**:
+  - `ai-service/app/routes/ai/lyrics.py:17`
+  - `ai-service/app/routes/ai/cover.py:17`
+  - `ai-service/app/routes/ai/mv.py:32,85`
+  - (此行已修复但提交有误，本次重新修复)
+
+#### 2. `/api/v1/ai/generate` 改为异步任务队列
+- `generate_music` 改为立即返回 `{"job_id": job_id}`，不再阻塞等待生成完成
+- 新增简易内存 `_job_store` 存储任务状态
+- 新增 `asyncio.create_task(_run_generation(...))` 后台异步执行完整生成链路
+- 新增 `GET /api/v1/ai/job/{job_id}` 轮询端点，返回 `{status, progress, result, error}`
+- 移除冗余的 `response_model=GenerateResponse` 避免返回类型不匹配
+
+#### 3. 语法错误修复
+- `music.py:269` 发现多余的独立 `)` 行（`_run_generation` 函数体后），导致 `SyntaxError: unmatched ')'`
+- `music.py:297` 移除多余的 `import json`（已全局导入）
+
+#### 4. 代码编译验证
+- 全部 4 个修改文件通过 `python -m py_compile` 无报错
+
+### 当前 Git 状态
+- 最新提交: `e1d82da` - "fix: fix 4 AI routes JSON body parsing + async task queue for /generate + job polling endpoint"
+- 已推送至 `origin/main`
+- 工作目录干净
+
+### 待办/未完成
+1. **Render 重新部署** — 用户需在 `ai-music-backend-v2` 服务 → Manual Deploy → Deploy latest commit
+2. **配置环境变量** — 用户需在 Render Dashboard 确认已设置 `SILICONFLOW_API_KEY`、`MUREKA_API_KEY` 等，否则生成会走 Mock
+3. **部署后验证** — 访问 `/create` 页，输入提示词→生成歌词→生成音乐，检查有无报错
+
+---
+
+## 会话记录 (2026-07-30)
+
+### 已完成工作
+
+#### 1. 修复 `mv.py` 缺少 `Request` 导入 (commit `9f756bd`)
+- **问题**: Render 启动报 `NameError: name 'Request' is not defined`
+- **原因**: 07-29 修复 `req: dict` → `request: Request` 时，`mv.py` 漏导入了 `from fastapi import Request`
+- **修复**: `mv.py:20` 补上 `Request` 导入
+
+#### 2. 修复 `@require_feature` 装饰器破坏 FastAPI 参数解析 (commit `c286edc` → `563c53d`)
+- **问题**: `/api/v1/ai/generate` 等受装饰器保护的路由持续返回 422 `{"loc":["query","request"]}`
+- **根本原因**: 装饰器手动覆盖 `wrapper.__signature__ = sig`，FastAPI 据此生成的参数列表丢失了 `Request`/Pydantic 类型信息，把所有参数当成 query 参数
+- **第一次尝试 (`c286edc`)**: 在覆盖签名时过滤掉 `Request` 类型的参数 —— 部分生效（lyrics 不再 422 但变 500），但 Pydantic 模型参数仍被错误处理
+- **最终解决 (`563c53d`)**: **完全移除对 `__signature__` 的覆盖**，仅靠 `@wraps(func)` 的 `__wrapped__` 机制让 FastAPI 自动找到原始函数签名。这样 FastAPI 能正确识别 `Request` 注入和 Pydantic body 解析
+
+#### 3. 歌词生成添加 Mock 兜底 (commit `8b3289e`)
+- 当 AI scheduler（硅基/OpenRouter）全部失败时，不再抛 500
+- 自动返回模板中文/英文歌词片段，让前端交互流程可以跑通
+- 受 `MOCK_FALLBACK` 环境变量控制（默认 `true`，与音乐生成保持一致）
+- 返回歌词带 `[Mock]` 前缀方便区分
+
+#### 4. 部署验证标记 (commit `a1a9e1a`)
+- `/health` 端点新增 `"build":"2026-07-30-v3"` 字段，用于确认 Render 是否拉到了最新代码
+
+#### 5. 代码编译验证
+- `mv.py`, `feature_flags.py`, `lyrics.py`, `main.py` 全部通过 `python -m py_compile`
+
+### 关键发现
+- **Render 部署不会自动拉最新代码**，每次 push 后都需在 Dashboard 手动点 **Manual Deploy → Deploy latest commit**
+- **`@require_feature` 装饰器不能覆盖 `__signature__`**: FastAPI 严重依赖原始签名来识别参数类型（Request/Path/Body/Query），任何手动覆盖都会破坏这个机制
+
+### 当前 Git 状态
+- 最新提交: `563c53d` - "fix: use functools.wraps __wrapped__ instead of overriding __signature__"
+- 已推送至 `origin/main`
+- 工作目录包含未提交的 AGENTS.md 变更
+
+### 阻塞项
+- **Render 还没有部署 commit `563c53d`**（`__signature__` 最终修复）。目前运行的是 13:21 部署的 `a1a9e1a`（旧装饰器 + mock 兜底），因此：
+  - `/api/v1/ai/generate` 仍返回 422（装饰器问题）
+  - `/api/v1/ai/lyrics` 返回 500（mock 路径可能触发了 `scheduler` 其他异常）
+- **明天的工作流**:
+  1. Render Dashboard → **Manual Deploy** → **Deploy latest commit** (`563c53d`)
+  2. 访问 `/health` 确认 `"build":"2026-07-30-v3"` 存在
+  3. 测试 `/create` 页的歌词生成、音乐生成流程
+  4. 如果仍有问题，在浏览器打开 F12 Console 截图给我
+
+### 环境变量（供明天排查参考）
+- Render 上需配置: `SILICONFLOW_API_KEY`, `OPENROUTER_API_KEY`, `MOCK_FALLBACK=true`
+- 如果 AI key 未配置，`MOCK_FALLBACK=true` 后歌词和音乐都会走 Mock 兜底
+
+---
+
+## 会话记录 (2026-07-31)
+
+### 已完成工作
+
+#### 1. 定位并修复 Render 服务绑错代码的问题
+- **问题**: 部署日志显示 `Inference Service API`、`POST /api/v1/music/run`、`music_platform.db`，完全不是我们的项目代码
+- **原因**: Render 服务 Root Directory 没填 `ai-service`，或绑定了错误仓库/入口文件
+- **解决**: 修正 Render Settings：
+  - Root Directory: `ai-service`
+  - Start Command: `gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT`
+  - Runtime: Python 3
+  - 更新 `render.yaml` (commit `5faa107`)
+
+#### 2. `@require_feature` 装饰器 422 问题彻底修复（4 天排查最终确定根因）
+- **问题**: `/api/v1/ai/generate`、`/lyrics` 等受保护路由持续 422 `{"loc":["query","request"]}`
+- **根本原因**（真正元凶）: 装饰器创建的 wrapper 函数 `__globals__` 是 `feature_flags.py` 模块的 globals，**不包含**原函数模块中定义的任何自定义类型（如 `GenerateRequest`、`Request` 等）。FastAPI 的 `get_typed_annotation` 用 `wrapper.__globals__` 解析 forward ref 字符串注解失败 → 参数被当成普通 query 字符串 → 422
+- **修复链路**:
+  - `c286edc`: 过滤 Request 类型参数（部分生效）
+  - `563c53d`: 完全移除 `__signature__` 覆盖（歌词不再 422 但 generate 仍 422）
+  - `89f3a9b`: 在 feature_flags.py 导入 Request（歌词全通）
+  - `a15208d` (**最终修复**): `wrapper.__globals__.update(func.__globals__)`，让 wrapper 能访问原函数模块的所有符号
+- **本地 + 线上验证**: 所有 AI 端点全部 200，不再 422
+
+#### 3. 线上全量测试通过 (2026-07-31 下午)
+- 服务 URL: `https://ai-music-backend-db6h.onrender.com`
+- 服务名: `ai-music-backend`，Runtime Python 3，Free plan
+- `/health` → 200 (build v4)
+- `/` 首页 → 200 (23KB)
+- `/create` → 200 (53KB)
+- `/console` → 200 (23KB)
+- `/docs` Swagger → 200
+- `/api/v1/features` → 200 (stage=1 开放 6 项)
+- `/api/v1/ai/lyrics` → 200 (Mock 兜底歌词，因 AI key 未配置)
+- `/api/v1/ai/generate` → 200 返回 job_id
+- `/api/v1/ai/job/{id}` → 200 任务轮询
+- `/api/v1/ai/cover/generate` → 503 (feature gate 关闭，stage=1 正常行为)
+- `/api/v1/ai/mv/generate` → 503 (feature gate 关闭，stage=1 正常行为)
+
+#### 4. 性能优化与 bug 修复（未完成，进行中）
+- **发现 `_try_hf_fallback` 严重 bug**: 函数是同步 `def`，但 `_get_http_client()` 返回 `httpx.AsyncClient`，`client.post()` 没加 `await` → 永远拿不到响应，HF 兜底**从未真正工作过**
+- 已修复: `_try_hf_fallback` 改为 `async def` + `await client.post()`，调用处加 `await`（**未提交**，工作目录有改动）
+
+### 当前 Git 状态
+- 最新提交: `a15208d` - "fix: merge func.__globals__ into wrapper.__globals__..."
+- 已推送至 `origin/main`
+- **工作目录有未提交改动**: `music.py` 的 HF fallback async 修复
+
+### 阻塞项/待办
+1. **提交并推送 `music.py` HF async 修复**（明天第一件事）
+2. **Render 手动部署**到 `ai-music-backend` (db6h)
+3. **性能优化方案**（已分析未实施）:
+   - Agnes/Mureka/HF 未配置 key 时已有快速降级检查，基本瞬时
+   - MV 生成慢：SDXL 4 图串行 (80s) + Runway 4 视频串行 (480s)，可并发化 (`asyncio.gather`) 节省 75%
+   - MV 默认 `num_scenes=4` 可降到 2 省一半时间
+4. **MV 模板**: 项目已有 6 套内置模板（含 mv_prompt），但 `/create` 页未展示模板选择，且 mv 端点 stage=1 关闭
+5. **建议配置**:
+   - `SILICONFLOW_API_KEY` / `OPENROUTER_API_KEY` → 真 AI 歌词（现在走 Mock）
+   - `FEATURE_STAGE=2` → 开放 MV/cover 高级功能
+   - `MOCK_FALLBACK=true` → 兜底开关
+
+### 关键经验教训
+- **`wrapper.__globals__` 不含调用模块符号** → forward ref 解析失败 → 422。装饰器必须 `update(func.__globals__)`
+- **同步 def 里调用 AsyncClient 不 await** → 拿到协程对象 → 静默失败。检查此类 bug 要看 `response = client.post(...)` 是否缺 `await`
+- Render 部署后必须手动 **Manual Deploy → Deploy latest commit**
