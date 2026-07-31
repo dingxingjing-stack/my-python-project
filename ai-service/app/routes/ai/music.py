@@ -267,13 +267,24 @@ async def _run_generation(job_id: str, request: GenerateRequest):
 
 
 @router.get("/job/{job_id}")
-
-@router.get("/job/{job_id}")
 async def get_job_status(job_id: str):
-    """查询生成任务状态 — 前端轮询用"""
-    from app.services.task_state_machine import get_task
-    
-    task = await get_task(job_id)
+    """查询生成任务状态 — 前端轮询用，先查 _job_store（音乐生成实际写入的位置），降级查 task_state_machine。"""
+    # 1. 优先查 _job_store（music.py 内部写入的实际位置）
+    job = _job_store.get(job_id)
+    if job:
+        return {
+            "job_id": job_id,
+            "status": job.get("status", "processing"),
+            "progress": job.get("progress", 0),
+            "result": job.get("result"),
+            "error": job.get("error"),
+        }
+    # 2. 降级查 task_state_machine（供 create.py 等用例写入的位置）
+    try:
+        from app.services.task_state_machine import get_task
+        task = await get_task(job_id)
+    except Exception:
+        task = None
     if not task:
         return {
             "job_id": job_id,
