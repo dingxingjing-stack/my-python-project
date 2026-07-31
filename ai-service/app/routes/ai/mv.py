@@ -36,7 +36,7 @@ async def generate_mv_full(request: Request):
     lyrics = req.get("lyrics", "")
     title = req.get("title", "Untitled")
     mv_style = req.get("style", "Cinematic")
-    num_scenes = req.get("num_scenes", 4)
+    num_scenes = req.get("num_scenes", 2)
     creation_id = req.get("creation_id")
 
     if not lyrics:
@@ -159,7 +159,7 @@ async def _generate_mv_from_lyrics(
     lyrics: str,
     title: str,
     mv_style: str = "Cinematic",
-    num_scenes: int = 4,
+    num_scenes: int = 2,
     user_id: int = 1,
     creation_id: Optional[int] = None,
     scheduler=None,
@@ -179,9 +179,9 @@ async def _generate_mv_from_lyrics(
     )
     scenes = _parse_storyboard(storyboard_result.text)
 
-    # Step 2: 硅基 SDXL 为每帧分镜生图
-    scene_images = []
-    for i, scene in enumerate(scenes):
+    # Step 2: 硅基 SDXL 为每帧分镜生图（并发执行，节省 75% 时间）
+    async def _gen_one_image(i_scene):
+        i, scene = i_scene
         prompt = scene.get("image_prompt", "") or scene.get("description", f"Scene {i+1}")
         try:
             image_result = await scheduler.generate_image_sdxl(
@@ -191,22 +191,23 @@ async def _generate_mv_from_lyrics(
                 user_id=user_id,
             )
             if image_result.data.get("image_urls"):
-                scene_images.append(image_result.data["image_urls"][0])
-            else:
-                scene_images.append("")
+                return image_result.data["image_urls"][0]
         except Exception:
-            scene_images.append("")
+            pass
+        return ""
 
-    # Step 3: Runway 图片转动态（或用占位视频）
-    video_segments = []
+    scene_images = await asyncio.gather(*[_gen_one_image(is_) for is_ in enumerate(scenes)])
+    scene_images = list(scene_images)
+
+    # Step 3: Runway 图片转动态（并发执行，或用占位视频）
     from app.services.runway_client import get_runway_client
     runway = get_runway_client()
 
-    for img_url in scene_images:
+    async def _gen_one_video(img_url):
         if not img_url:
-            continue
+            return None
         try:
-            if runway.is_configured and img_url:
+            if runway.is_configured:
                 task = await runway.image_to_video(
                     start_image=img_url,
                     prompt=f"{mv_style} scene, cinematic motion",
@@ -218,11 +219,13 @@ async def _generate_mv_from_lyrics(
                     video_url = result.get("output", {}).get("url", "")
                     if video_url:
                         resp = await httpx.AsyncClient().get(video_url, timeout=120)
-                        video_path = storage.save_video(resp.content, ext="mp4")
-                        video_segments.append(video_path)
-                        continue
+                        return storage.save_video(resp.content, ext="mp4")
         except Exception:
             pass
+        return None
+
+    video_segments_raw = await asyncio.gather(*[_gen_one_video(u) for u in scene_images])
+    video_segments = [seg for seg in video_segments_raw if seg]
 
     # Step 4: FFmpeg 合成最终 MV
     final_video_url = await _compose_mv(
