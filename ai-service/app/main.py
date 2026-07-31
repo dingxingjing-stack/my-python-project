@@ -246,7 +246,7 @@ def _register_routers(app: FastAPI) -> None:
     # ── Health check（GET + HEAD 兼容外部探活） ──
     @app.get("/health", include_in_schema=False)
     async def health():
-        return {"status": "ok", "build": "2026-07-30-v3"}
+        return {"status": "ok", "build": "2026-07-31-v4"}
 
     @app.head("/health", include_in_schema=False)
     async def health_head():
