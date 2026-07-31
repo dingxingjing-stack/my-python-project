@@ -225,10 +225,6 @@ def require_feature(feature: str) -> Callable:
         { "error": "功能暂未开放", "detail": "人声克隆 暂未开放" }
     """
     def decorator(func: Callable[..., Awaitable]) -> Callable[..., Awaitable]:
-        import typing
-        # 保留原始函数的类型注解，确保 FastAPI 能正确解析 UploadFile 等类型
-        hints = typing.get_type_hints(func)
-        sig = inspect.signature(func)
 
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -249,6 +245,10 @@ def require_feature(feature: str) -> Callable:
                 )
             return await func(*args, **kwargs)
 
+        # 让 wrapper 的 __globals__ 包含原函数模块的所有符号，
+        # 这样 FastAPI 的 get_typed_annotation 才能解析 forward ref
+        # （如 GenerateRequest、Request 等，这些类只在调用模块中定义）
+        wrapper.__globals__.update(func.__globals__)
         return wrapper
     return decorator
 
@@ -269,6 +269,7 @@ def require_feature_sync(feature: str) -> Callable:
                     },
                 )
             return func(*args, **kwargs)
+        wrapper.__globals__.update(func.__globals__)
         return wrapper
     return decorator
 
