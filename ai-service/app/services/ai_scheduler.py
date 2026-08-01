@@ -568,6 +568,7 @@ Output ONLY valid JSON, no markdown."""
         if not self._or_key:
             raise RuntimeError("OpenRouter API key 未配置 (OPENROUTER_API_KEY)")
 
+        print(f"[openrouter] model={model} max_tokens={max_tokens} temp={temperature}")
         async with httpx.AsyncClient(timeout=90) as client:
             resp = await client.post(
                 f"{self._or_base}/chat/completions",
@@ -584,6 +585,8 @@ Output ONLY valid JSON, no markdown."""
                     "max_tokens": max_tokens,
                 },
             )
+            if resp.status_code != 200:
+                print(f"[openrouter ERROR] status={resp.status_code} model={model} body={resp.text[:500]}")
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"] or ""
