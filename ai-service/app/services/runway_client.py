@@ -1,6 +1,6 @@
-"""Runway Gen-4.5 video generation client.
+"""Runway Gen-4 video generation client.
 
-Reference: https://dev.runwayml.com/
+Reference: https://docs.dev.runwayml.com/
 """
 from __future__ import annotations
 
@@ -21,13 +21,16 @@ class RunwayClient:
         self._key = s.runway_api_key
         self._base = s.runway_api_base.rstrip("/")
         self._client = httpx.AsyncClient(
-            timeout=httpx.Timeout(60, connect=10),
-            headers={"X-Runway-API-Key": self._key} if self._key else None,
+            timeout=httpx.Timeout(120, connect=10),
+            headers={
+                "Authorization": f"Bearer {self._key}",
+                "X-Runway-Version": "2024-11-06",
+            } if self._key else None,
         )
 
     @property
     def is_configured(self) -> bool:
-        return bool(self._key)
+        return bool(self._key) and not self._key.startswith("your-")
 
     # ------------------------------------------------------------------
     # Public
@@ -37,7 +40,12 @@ class RunwayClient:
         self, prompt: str, duration: int = 5
     ) -> Dict[str, Any]:
         """Generate a single short video segment. Returns task dict."""
-        body = {"promptText": prompt, "duration": duration, "model": "gen4-turbo"}
+        body = {
+            "model": "gen4_turbo",
+            "promptText": prompt,
+            "duration": duration,
+            "ratio": "1280:720",
+        }
         return await self._submit(body)
 
     async def image_to_video(
@@ -47,12 +55,13 @@ class RunwayClient:
         duration: int = 5,
     ) -> Dict[str, Any]:
         body = {
+            "model": "gen4_turbo",
             "promptImage": start_image,
             "promptText": prompt,
             "duration": duration,
-            "model": "gen4-turbo",
+            "ratio": "1280:720",
         }
-        return await self._submit(body)
+        return await self._submit(body, endpoint="image_to_video")
 
     async def get_task(self, task_id: str) -> Dict[str, Any]:
         resp = await self._client.get(f"{self._base}/tasks/{task_id}")
@@ -78,8 +87,10 @@ class RunwayClient:
     # ------------------------------------------------------------------
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=10))
-    async def _submit(self, body: Dict[str, Any]) -> Dict[str, Any]:
-        resp = await self._client.post(f"{self._base}/text_to_video", json=body)
+    async def _submit(self, body: Dict[str, Any], endpoint: str = "text_to_video") -> Dict[str, Any]:
+        resp = await self._client.post(f"{self._base}/{endpoint}", json=body)
+        if resp.status_code != 200:
+            logger.error("Runway {} error {}: {}", endpoint, resp.status_code, resp.text[:500])
         resp.raise_for_status()
         return resp.json()
 

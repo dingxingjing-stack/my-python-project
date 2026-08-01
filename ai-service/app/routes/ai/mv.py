@@ -224,7 +224,13 @@ async def _generate_mv_from_lyrics(
                     task_id = task.get("id", "")
                     if task_id:
                         result = await runway.wait_for_task(task_id, timeout=120)
-                        video_url = result.get("output", {}).get("url", "")
+                        video_url = (result.get("output") or [{}])
+                        if isinstance(video_url, list):
+                            video_url = video_url[0].get("url") if video_url and isinstance(video_url[0], dict) else ""
+                        elif isinstance(video_url, dict):
+                            video_url = video_url.get("url", "")
+                        else:
+                            video_url = ""
                         if video_url:
                             resp = await httpx.AsyncClient().get(video_url, timeout=120)
                             return storage.save_video(resp.content, ext="mp4")

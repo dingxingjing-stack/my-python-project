@@ -73,7 +73,7 @@ class AgnesMusicService:
                 },
             )
         if resp.status_code != 200:
-            return AgnesResult(success=False, error=f"Agnes API error: {resp.status_code}")
+            raise RuntimeError(f"Agnes API error: {resp.status_code} {resp.text[:200]}")
         data = resp.json()
         return AgnesResult(
             success=True,

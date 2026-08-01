@@ -24,9 +24,9 @@ class Settings(BaseSettings):
     # ── OpenRouter ──
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_long_model: str = "nvidia/nemotron-3-super-120b-a12b:free"
-    openrouter_code_model: str = "nvidia/nemotron-3-super-120b-a12b:free"
-    openrouter_vision_model: str = "poolside/laguna-xs-2.1:free"
+    openrouter_long_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
+    openrouter_code_model: str = "cohere/north-mini-code:free"
+    openrouter_vision_model: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
     openrouter_text_fallback: str = "nvidia/nemotron-3-nano-30b-a3b:free"
 
     # ── 硅基流动 SiliconFlow ──
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     # ── Runway MV 生成 ──
     runway_api_key: str = ""
-    runway_api_base: str = "https://api.runwayml.com/v1"
+    runway_api_base: str = "https://api.dev.runwayml.com/v1"
 
     # ── 灰度管控 ──
     # FEATURE_STAGE 1/2/3，1=公测基础版默认关闭重型功能，3=全量放开
