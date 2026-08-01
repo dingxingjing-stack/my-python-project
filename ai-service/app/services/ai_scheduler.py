@@ -380,7 +380,7 @@ MV Style: {mv_style}"""
             AITaskType.CODE,
             [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
             temperature=0.8,
-            max_tokens=1500,
+            max_tokens=800,
             credit_action="mv",
             user_id=user_id,
         )
