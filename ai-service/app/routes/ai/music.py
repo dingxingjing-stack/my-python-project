@@ -9,6 +9,7 @@ AI 音乐生成路由
 from __future__ import annotations
 
 import os
+import time
 import uuid
 import random
 import asyncio
@@ -164,6 +165,7 @@ async def generate_music(request: GenerateRequest):
 
 async def _run_generation(job_id: str, request: GenerateRequest):
     """后台任务：真正跑生成流程，完成后写入 _job_store"""
+    t_start = time.time()
     try:
         # 更新状态
         _job_store[job_id]["status"] = "processing"
@@ -264,6 +266,12 @@ async def _run_generation(job_id: str, request: GenerateRequest):
         print(f"[generate 未捕获] {type(e).__name__}: {e}")
         traceback.print_exc()
         _job_store[job_id] = {"status": "failed", "progress": 100, "result": None, "error": f"{type(e).__name__}: {e}"}
+    finally:
+        dur_ms = int((time.time() - t_start) * 1000)
+        fin = _job_store[job_id]
+        fin["finished_at"] = time.time()
+        fin["duration_ms"] = dur_ms
+        print(f"[generate] job={job_id} status={fin.get('status')} elapsed={dur_ms}ms", flush=True)
 
 
 @router.get("/job/{job_id}")

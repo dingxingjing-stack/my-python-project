@@ -26,6 +26,12 @@ from app.services.feature_flags import require_feature
 
 router = APIRouter(prefix="/ai", tags=["ai-mv"])
 
+# 并发信号量 — 防止第三方 AI 接口被大量并发请求打爆
+_MAX_IMAGE_CONCURRENCY = 2
+_MAX_VIDEO_CONCURRENCY = 1
+_image_sem = asyncio.Semaphore(_MAX_IMAGE_CONCURRENCY)
+_video_sem = asyncio.Semaphore(_MAX_VIDEO_CONCURRENCY)
+
 
 @router.post("/mv/generate")
 @require_feature("ai_mv_advanced")
@@ -182,19 +188,20 @@ async def _generate_mv_from_lyrics(
     # Step 2: 硅基 SDXL 为每帧分镜生图（并发执行，节省 75% 时间）
     async def _gen_one_image(i_scene):
         i, scene = i_scene
-        prompt = scene.get("image_prompt", "") or scene.get("description", f"Scene {i+1}")
-        try:
-            image_result = await scheduler.generate_image_sdxl(
-                prompt=prompt,
-                width=1024, height=576,
-                num_images=1,
-                user_id=user_id,
-            )
-            if image_result.data.get("image_urls"):
-                return image_result.data["image_urls"][0]
-        except Exception:
-            pass
-        return ""
+        async with _image_sem:
+            prompt = scene.get("image_prompt", "") or scene.get("description", f"Scene {i+1}")
+            try:
+                image_result = await scheduler.generate_image_sdxl(
+                    prompt=prompt,
+                    width=1024, height=576,
+                    num_images=1,
+                    user_id=user_id,
+                )
+                if image_result.data.get("image_urls"):
+                    return image_result.data["image_urls"][0]
+            except Exception:
+                pass
+            return ""
 
     scene_images = await asyncio.gather(*[_gen_one_image(is_) for is_ in enumerate(scenes)])
     scene_images = list(scene_images)
@@ -206,23 +213,24 @@ async def _generate_mv_from_lyrics(
     async def _gen_one_video(img_url):
         if not img_url:
             return None
-        try:
-            if runway.is_configured:
-                task = await runway.image_to_video(
-                    start_image=img_url,
-                    prompt=f"{mv_style} scene, cinematic motion",
-                    duration=5,
-                )
-                task_id = task.get("id", "")
-                if task_id:
-                    result = await runway.wait_for_task(task_id, timeout=120)
-                    video_url = result.get("output", {}).get("url", "")
-                    if video_url:
-                        resp = await httpx.AsyncClient().get(video_url, timeout=120)
-                        return storage.save_video(resp.content, ext="mp4")
-        except Exception:
-            pass
-        return None
+        async with _video_sem:
+            try:
+                if runway.is_configured:
+                    task = await runway.image_to_video(
+                        start_image=img_url,
+                        prompt=f"{mv_style} scene, cinematic motion",
+                        duration=5,
+                    )
+                    task_id = task.get("id", "")
+                    if task_id:
+                        result = await runway.wait_for_task(task_id, timeout=120)
+                        video_url = result.get("output", {}).get("url", "")
+                        if video_url:
+                            resp = await httpx.AsyncClient().get(video_url, timeout=120)
+                            return storage.save_video(resp.content, ext="mp4")
+            except Exception:
+                pass
+            return None
 
     video_segments_raw = await asyncio.gather(*[_gen_one_video(u) for u in scene_images])
     video_segments = [seg for seg in video_segments_raw if seg]

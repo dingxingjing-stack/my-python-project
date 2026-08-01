@@ -89,12 +89,16 @@ class AgnesMusicService:
             "2. A set of lyrics following standard song structure (verse, chorus, bridge)\n"
             "Format: OPTIMIZED_PROMPT: ...\n---\nLYRICS: ..."
         )
+        user_prompt = f"Style: {req.style}\nPrompt: {req.prompt}\nDuration: {req.duration}s"
         try:
-            result = await self._llm.chat(
-                system=system_prompt,
-                message=f"Style: {req.style}\nPrompt: {req.prompt}\nDuration: {req.duration}s",
-                max_tokens=1024,
-            )
+            if self._llm.available_providers():
+                result = await self._llm.complete(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    max_tokens=1024,
+                )
+            else:
+                return AgnesResult(success=False, error="No LLM provider", optimized_prompt=req.prompt)
             text = (result or "").strip()
             optimized = req.prompt
             lyrics = ""
