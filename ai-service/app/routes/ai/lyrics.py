@@ -1,4 +1,4 @@
-"""AI lyrics generation routes — V1.0 对接 ai_scheduler。"""
+"""AI lyrics generation routes — V1.0对接 ai_scheduler。"""
 from __future__ import annotations
 
 import json
@@ -18,7 +18,6 @@ MOCK_FALLBACK_ENABLED = os.getenv("MOCK_FALLBACK", "true").lower() in ("1", "tru
 @router.post("/lyrics")
 @require_feature("ai_lyrics")
 async def generate_lyrics(request: Request):
-    """歌词生成 — 对接硅基 Qwen2.5-7B-Instruct，自动扣 1 Credits。"""
     req = await request.json()
     user_id = req.get("user_id", 1)
     prompt = req.get("prompt", "")
@@ -46,7 +45,6 @@ async def generate_lyrics(request: Request):
         print(f"[lyrics] AI generation failed: {exc}")
         if not MOCK_FALLBACK_ENABLED:
             raise HTTPException(500, f"AI generation failed: {exc}")
-        # Mock 兜底 — 返回模板歌词让前端流程能跑通
         mock_text = _build_mock_lyrics(prompt, style, language)
         db = await get_db()
         cur = await db.execute(
@@ -72,10 +70,8 @@ async def generate_lyrics(request: Request):
             },
         }
 
-    # 解析 AI 返回的歌词结构
     parsed = _parse_lyrics(result.text)
 
-    # 存入 lyrics 表（支持多版本）
     db = await get_db()
     cur = await db.execute(
         """
@@ -85,7 +81,7 @@ async def generate_lyrics(request: Request):
         (
             creation_id,
             user_id,
-            1,  # version
+            1,
             parsed.get("title", ""),
             parsed.get("lyrics", result.text),
             parsed.get("lrc", ""),
@@ -98,7 +94,6 @@ async def generate_lyrics(request: Request):
     await db.commit()
     lyrics_id = cur.lastrowid
 
-    # 查询版本号
     ver_row = await (await db.execute(
         "SELECT COUNT(*) FROM lyrics WHERE creation_id = ? AND user_id = ?",
         (creation_id, user_id),
@@ -122,7 +117,6 @@ async def generate_lyrics(request: Request):
 
 @router.get("/lyrics/{lyrics_id}")
 async def get_lyrics(lyrics_id: int):
-    """获取单条歌词记录。"""
     db = await get_db()
     cur = await db.execute("SELECT * FROM lyrics WHERE id = ?", (lyrics_id,))
     row = await cur.fetchone()
@@ -133,7 +127,6 @@ async def get_lyrics(lyrics_id: int):
 
 @router.get("/lyrics/versions/{creation_id}")
 async def list_lyrics_versions(creation_id: int):
-    """获取某作品的所有歌词版本。"""
     db = await get_db()
     cur = await db.execute(
         "SELECT * FROM lyrics WHERE creation_id = ? ORDER BY version DESC",
@@ -144,30 +137,72 @@ async def list_lyrics_versions(creation_id: int):
 
 
 def _parse_lyrics(text: str) -> dict:
-    """解析 AI 返回的歌词结构。"""
     result = {"title": "", "lyrics": text, "lrc": ""}
-
-    # 提取标题
     title_match = re.search(r"Title:\s*(.+)", text, re.IGNORECASE)
     if title_match:
         result["title"] = title_match.group(1).strip()
-
-    # 提取 LRC
     lrc_match = re.search(r"LRC:\s*([\s\S]+)", text, re.IGNORECASE)
     if lrc_match:
         result["lrc"] = lrc_match.group(1).strip()
-
     return result
 
 
-def _build_mock_lyrics(prompt: str, style: str, language: str) -> str:
-    """生成 Mock 歌词（AI 不可用时兜底）。"""
-    is_zh = language.startswith("zh")
-    title = prompt[:20] if prompt else "Untitled"
-    if is_zh:
-        return f"""Title: {title}
+_MOCK_LYRICS = {
+    "ja": """Verse 1:
+星が窓辺に降り注ぐ
+夜は水のように優しく
+心の中の歌が
+風に乗って遠くへ
 
-Verse 1:
+Chorus:
+夢を追う人は決して疲れない
+嵐を越えて優雅に
+僕たちはみんな旅の途中
+心の光へ走り続ける
+
+LRC:
+[00:00.00]星が窓辺に降り注ぐ
+[00:05.00]夜は水のように優しく
+[00:10.00]心の中の歌が
+[00:15.00]風に乗って遠くへ""",
+
+    "ko": """Verse 1:
+별빛이 창가에 내려와
+밤은 물처럼 부드럽게
+마음속의 그 노래가
+바람을 타고 멀리 멀리
+
+Chorus:
+꿈을 찾는 우리는 멈추지 않아
+폭풍을 가로질러
+우린 모두 여정 중이야
+마음속의 빛을 향해 달려가
+
+LRC:
+[00:00.00]별빛이 창가에 내려와
+[00:05.00]밤은 물처럼 부드럽게
+[00:10.00]마음속의 그 노래가
+[00:15.00]바람을 타고 멀리 멀리""",
+
+    "es": """Verse 1:
+La luz de las estrellas sobre la ventana
+La noche es suave como el agua
+La cancion de mi corazon
+Flota lejos con el viento
+
+Chorus:
+Los sonadores nunca se cansan
+Atravesando la tormenta con gracia
+Todos estamos en el camino
+Corriendo hacia la luz interior
+
+LRC:
+[00:00.00]La luz de las estrellas
+[00:05.00]La noche es suave como el agua
+[00:10.00]La cancion de mi corazon
+[00:15.00]Flota lejos con el viento""",
+
+    "zh": """Verse 1:
 星光落在窗前
 夜色温柔如水
 心中那首歌谣
@@ -179,36 +214,14 @@ Chorus:
 我们都在路上
 奔向心中的光
 
-Verse 2:
-回忆变成诗句
-写下每个瞬间
-时间不会停歇
-但爱永远年轻
-
-Bridge:
-走过四季变迁
-依然相信明天
-心中的火焰
-从未熄灭过
-
-Chorus:
-追梦的人永不疲倦
-穿越风雨也从容
-我们都在路上
-奔向心中的光
-
 LRC:
 [00:00.00]星光落在窗前
-[00:05.00]夜色温柔如水
+[00:05.00]月色温柔如水
 [00:10.00]心中那首歌谣
-[00:15.00]随风轻轻飘远
-[00:20.00]追梦的人永不疲倦
-[00:25.00]穿越风雨也从容"""
-    else:
-        return f"""Title: {title}
+[00:15.00]随风轻轻飘远""",
 
-Verse 1:
-Starlight falls upon the window
+    "en": """Verse 1:
+Starlight falls upon the garden
 Night is gentle as the water
 The song inside my heart
 Drifts away with the wind
@@ -217,10 +230,19 @@ Chorus:
 Dreamers never tire
 Walking through the storm with grace
 We are all on the road
-Running to the light within
+Running toward the light within
 
 LRC:
-[00:00.00]Starlight falls upon the window
+[00:00.00]Starlight falls upon the garden
 [00:05.00]Night is gentle as the water
-[00:10.00]The song inside my heart
-[00:15.00]Drifts away with the wind"""
+[00:10.00]The song inside my soul
+[00:15.00]Drifts away with the wind""",
+}
+
+
+def _build_mock_lyrics(prompt: str, style: str, language: str) -> str:
+    lang = (language or "en").lower()
+    base = prompt[:20] if prompt else "Untitled"
+    if lang not in _MOCK_LYRICS:
+        lang = "en"
+    return "Title: {}\n\n{}".format(base, _MOCK_LYRICS[lang])

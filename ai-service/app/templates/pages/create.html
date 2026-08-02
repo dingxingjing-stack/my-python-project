@@ -63,6 +63,7 @@
               <option value="en">{{ _('English') }}</option>
               <option value="ja">{{ _('日本語') }}</option>
               <option value="ko">{{ _('한국어') }}</option>
+              <option value="es">{{ _('Español') }}</option>
             </select>
           </div>
           <div>
@@ -517,13 +518,19 @@
                 clearInterval(poll);
                 this.musicGenerating = false;
                 this.musicProgress = 100;
-                // Parse result
-                if (status.result?.tracks) {
+                // Parse result - 后端可能返回 tracks 数组或单个 audio_url
+                if (status.result?.tracks && status.result.tracks.length > 0) {
                   this.musicVersions = status.result.tracks;
-                  if (this.musicVersions.length > 0) {
-                    this.form.audio_url = this.musicVersions[0].audio_url;
-                    this.form.title = this.form.title || this.musicVersions[0].title;
-                  }
+                } else if (status.result?.audio_url) {
+                  this.musicVersions = [{
+                    audio_url: status.result.audio_url,
+                    title: this.form.title || 'Generated Track',
+                    provider: status.result.ai_provider || 'ai',
+                  }];
+                }
+                if (this.musicVersions.length > 0) {
+                  this.form.audio_url = this.musicVersions[0].audio_url;
+                  this.form.title = this.form.title || this.musicVersions[0].title;
                 }
               } else if (status.status === 'failed') {
                 clearInterval(poll);
@@ -576,9 +583,12 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idemKey },
             body: JSON.stringify({
+              lyrics: this.form.lyrics || this.form.prompt || '',
+              title: this.form.title || 'Untitled',
               audio_url: this.form.audio_url || '',
               prompt: this.form.prompt,
-              style: this.form.videoStyle,
+              style: this.form.videoStyle || this.form.style || 'Cinematic',
+              num_scenes: 2,
             }),
           });
           const data = await res.json();

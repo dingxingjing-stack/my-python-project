@@ -34,7 +34,7 @@ _video_sem = asyncio.Semaphore(_MAX_VIDEO_CONCURRENCY)
 
 
 @router.post("/mv/generate")
-@require_feature("ai_mv_advanced")
+@require_feature("ai_mv_simple")
 async def generate_mv_full(request: Request):
     """MV 全流程生成 — 分镜→生图→动态→合成，扣 20 Credits。"""
     req = await request.json()

@@ -58,7 +58,7 @@ class AgnesMusicService:
     async def _call_agnes_api(self, req: AgnesSongRequest) -> AgnesResult:
         import httpx
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 f"{self.api_base}/lyrics/generate",
                 json={

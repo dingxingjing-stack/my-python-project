@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # ── OpenRouter ──
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # 主用模型（2026 年 8 月最新免费 ID）
     openrouter_long_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
     openrouter_code_model: str = "cohere/north-mini-code:free"
     openrouter_vision_model: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
@@ -66,29 +67,33 @@ class Settings(BaseSettings):
     daily_siliconflow_calls: int = 100
     daily_openrouter_calls: int = 200
 
-    # ── OpenRouter 模型池（16 款免费模型按用途分组） ──
+    # ── OpenRouter 模型池（2026 年 8 月最新免费模型，8 组去重） ──
+    # 来源: openrouter.ai/models?max-price=0
+    # 注意: 每组内的模型不与其他组重复
     or_pool_long: str = (
-        "nemotron/nemotron-3-ultra:free,"
-        "nemotron/nemotron-3-super:free,"
-        "nemotron/nemotron-3-nano-30b-a3b:free,"
-        "nemotron/nemotron-nano-9b-v2:free,"
-        "google/gemma-4-26b-a4b:free"
+        "nvidia/nemotron-3-ultra-550b-a55b:free,"
+        "nvidia/nemotron-3-super-120b-a12b:free"
     )
     or_pool_chat: str = (
-        "lagoon/laguna-m.1:free,"
-        "lagoon/laguna-s-2.1:free,"
-        "lagoon/laguna-xs-2.1:free,"
-        "ling/ling-3.0-flash:free"
+        "nvidia/nemotron-3-nano-30b-a3b:free,"
+        "nvidia/nemotron-nano-9b-v2:free,"
+        "google/gemma-4-26b-a4b-it:free,"
+        "google/gemma-4-31b-it:free,"
+        "inclusionai/ling-3.0-flash:free"
     )
-    or_pool_code: str = "cohere/command-r-code:free"
+    or_pool_code: str = "cohere/north-mini-code:free"
     or_pool_multimodal: str = (
-        "nemotron/nemotron-3-nano-omni:free,"
-        "nemotron/nemotron-nano-12b-2-vl:free"
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,"
+        "nvidia/nemotron-nano-12b-v2-vl:free"
     )
-    or_pool_embedding: str = "nemotron/nemotron-3-embed-1b:free"
-    or_pool_safety: str = "nemotron/nemotron-3.5-content-safety:free"
-    or_pool_rerank: str = "nvidia/llama-nemotron-rerank-vl-1b:free"
-    or_pool_other: str = "openai/gpt-oss-20b:free"
+    or_pool_embedding: str = "nvidia/nemotron-3-embed-1b:free"
+    or_pool_safety: str = "nvidia/nemotron-3.5-content-safety:free"
+    or_pool_rerank: str = "nvidia/llama-nemotron-rerank-vl-1b-v2:free"
+    or_pool_other: str = (
+        "openai/gpt-oss-20b:free,"
+        "poolside/laguna-s-2.1:free,"
+        "poolside/laguna-xs-2.1:free"
+    )
 
     @field_validator("allowed_origins")
     @classmethod

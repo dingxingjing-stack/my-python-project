@@ -13,14 +13,20 @@
 <body x-data="app()" x-init="init()" class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
   <script>
     window.TRANSLATIONS = {{ translations_json|safe }};
+    window.LOCALE_NAMES = {{ locale_names|tojson }};
     function app() {
       return {
         lang: localStorage.getItem('lang') || '{{ current_locale }}',
         translations: window.TRANSLATIONS || {},
+        localeNames: window.LOCALE_NAMES || {},
         isLoggedIn: !!localStorage.getItem('token'),
         t(key) {
           const dict = this.translations[this.lang];
           return dict && dict[key] ? dict[key] : key;
+        },
+        localeDisplay(code) {
+          const names = { 'en': 'English', 'zh_CN': '简体中文', 'ja_JP': '日本語', 'ko_KR': '한국어', 'es_ES': 'Español' };
+          return names[code] || names['en'];
         },
         setLang(l) {
           this.lang = l;

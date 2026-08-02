@@ -179,6 +179,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
 
         # ── 第 1 层：Agnes 优化提示词 / 生成歌词 ──
         print("[generate] 第 1 层: Agnes 优化提示词...")
+        _job_store[job_id]["progress"] = 12
         agnes_request = AgnesSongRequest(
             prompt=request.prompt.strip(),
             style=request.style,
@@ -186,6 +187,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
             type=request.type,
         )
         agnes_result = await agnes_service.generate_song(agnes_request)
+        _job_store[job_id]["progress"] = 20
 
         ai_provider = "agnes" if agnes_result.optimized_prompt and agnes_result.optimized_prompt != request.prompt.strip() else "gemini"
         agnes_debug = (
@@ -199,7 +201,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
         if agnes_result.generated_lyrics:
             final_prompt = agnes_result.generated_lyrics.strip()
 
-        _job_store[job_id]["progress"] = 30
+        _job_store[job_id]["progress"] = 35
 
         # ── 第 2 层：Mureka 生成音频 ──
         print("[generate] 第 2 层: Mureka 生成音频...")
@@ -208,7 +210,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
             style=request.style,
             duration=request.duration,
         )
-        _job_store[job_id]["progress"] = 50
+        _job_store[job_id]["progress"] = 45
         try:
             mureka_result = await mureka_service.generate_song(mureka_request)
             if mureka_result.success:
@@ -228,7 +230,9 @@ async def _run_generation(job_id: str, request: GenerateRequest):
 
         # ── 第 3 层：HF MusicGen 兜底 ──
         print("[generate] 第 3 层: HF MusicGen 兜底...")
+        _job_store[job_id]["progress"] = 65
         hf_audio = await _try_hf_fallback(prompt=final_prompt, duration=request.duration)
+        _job_store[job_id]["progress"] = 80
         if hf_audio:
             result = {
                 "success": True,
@@ -244,6 +248,8 @@ async def _run_generation(job_id: str, request: GenerateRequest):
         if not MOCK_FALLBACK_ENABLED:
             _job_store[job_id] = {"status": "failed", "progress": 100, "result": None, "error": "所有 AI 引擎均不可用，且 MOCK 已被关闭"}
             return
+
+        _job_store[job_id]["progress"] = 90
 
         mock_urls = [
             "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",

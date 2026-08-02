@@ -56,6 +56,11 @@ _configure_uvicorn_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
+
+    # P0 启动自检 — 必填密钥缺失直接抛出异常阻止启动
+    from app.startup_check import run_startup_checks
+    run_startup_checks(exit_on_failure=True)
+
     await init_db()
 
     from app.services.recovery import run_startup_recovery, periodic_recovery_loop

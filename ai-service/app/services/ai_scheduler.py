@@ -2,10 +2,10 @@
 AI 统一调度中间件 — SiliconFlow + OpenRouter 双服务商，带降级链。
 
 降级策略：
-  TEXT  → 硅基 Qwen2.5-7B-Instruct → OpenRouter lagoon/laguna-m.1:free
-  CODE  → 硅基 Qwen2.5-Coder-7B-Instruct → OpenRouter cohere/command-r-code:free
+  TEXT  → 硅基 Qwen2.5-7B-Instruct → OpenRouter nemotron-3-nano-30b-a3b:free
+  CODE  → 硅基 Qwen2.5-Coder-7B-Instruct → OpenRouter cohere/north-mini-code:free
   LONG  → OpenRouter nemotron-3-ultra:free  （仅 OR，无降级）
-  CODE_ALT → OpenRouter cohere/command-r-code:free（仅 OR，无降级）
+  CODE_ALT → OpenRouter cohere/north-mini-code:free（仅 OR，无降级）
   VISION   → OpenRouter nemotron-3-nano-omni:free（仅 OR，无降级）
 
 服务商独立限额：
@@ -261,7 +261,16 @@ class AIScheduler:
         vocal: str = "auto",
         user_id: int = 1,
     ) -> AIResult:
-        system = """You are a professional songwriter. Write emotionally engaging, singable lyrics.
+        lang_map = {
+            "zh": "Chinese (简体中文)",
+            "en": "English",
+            "ja": "Japanese (日本語)",
+            "ko": "Korean (한국어)",
+            "es": "Spanish (Español)",
+        }
+        lang_name = lang_map.get(language, language or "English")
+        system = f"""You are a professional songwriter. Write emotionally engaging, singable lyrics.
+Lyrics language: {lang_name}. All lyrics must be in this language.
 Always return in this format:
 
 Title: <song title>
@@ -284,8 +293,8 @@ Chorus:
 Then also provide LRC format:
 
 LRC:
-[00:00.00] first line
-[00:05.00] second line
+[00:00.00] first lyric line
+[00:05.00] second lyric line
 ..."""
         user_msg = (
             f"Topic: {prompt}\n"

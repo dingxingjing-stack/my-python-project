@@ -341,3 +341,62 @@
 - **`wrapper.__globals__` 不含调用模块符号** → forward ref 解析失败 → 422。装饰器必须 `update(func.__globals__)`
 - **同步 def 里调用 AsyncClient 不 await** → 拿到协程对象 → 静默失败。检查此类 bug 要看 `response = client.post(...)` 是否缺 `await`
 - Render 部署后必须手动 **Manual Deploy → Deploy latest commit**
+
+---
+
+## 会话记录 (2026-08-02)
+
+### 背景转折
+- 部署平台已从 **Render 切换为 Modal**（`ai-service/modal_server.py` 为入口，App 名 `avireon-ai-music`）
+- 线上 URL: `https://dingxingjing-stack--avireon-ai-music-web.modal.run`
+- 部署命令（GBK 编码坑，必须 UTF-8 前缀）:
+  `chcp 65001 >$null; $env:PYTHONIOENCODING='utf-8'; modal deploy modal_server.py`
+- `/health` 返回 `{"status":"ok","build":"2026-07-31-v4"}`（build 版本号未随本次会话递增）
+
+### 已完成工作
+
+#### 1. 多语言支持扩展至 5 种语言 (`app/i18n.py` 重写 + 前端)
+- **根因**: `i18n.py` 原 `SUPPORTED_LOCALES={"zh_CN","en"}`，navbar/settings 切换器只有 en/zh
+- **i18n.py 重写**: `SUPPORTED_LOCALES={"zh_CN","en","ja_JP","ko_KR","es_ES"}`；内置 `_BUILTIN_JA/_KO/_ES` 翻译字典（各约 90 键）+ `_merged_translations()` 合并 gettext catalog；`detect_locale()` 新增 accept-language ja/ko/es 识别；`i18n_context()` 新增 `supported_locales`/`locale_names`；新增路由 `GET /api/v1/lang/current`、`POST /api/v1/lang/set`、`GET /api/v1/lang/translations`
+- `navbar.html`: 语言切换器增加 日本語/한국어/Español + 按钮显示当前语言名称（`localeDisplay`）+ 新增 **Templates** 导航链接（桌面+移动端，此前模板库页 `/templates` 不可达）
+- `base.html`: `app()` 新增 `localeDisplay()`/`localeNames`，`setLang` 支持任意语言
+- `settings.html`: 语言下拉 + 默认歌词语言下拉增加 ja/ko/es
+- `i18n.py` 补充 `No templates yet` 三语翻译
+
+#### 2. MV 无法生成 bug 修复 (`create.html`)
+- **根因**: 前端 MV 调用请求体只发 `{audio_url, prompt, style}`，后端 `mv.py:48` 要求 `lyrics` 字段 → 恒 400 "Missing lyrics"
+- **修复**: `create.html` generateMV 请求体补齐 `lyrics`/`title`/`num_scenes`/`style`
+- `mv.py` 此前已将 feature gate 从 `ai_mv_advanced` 改为 `ai_mv_simple`（stage=1 已开放）
+
+#### 3. Modal secrets 挂载 (`modal_server.py`)
+- `web()` secrets 列表新增 `modal.Secret.from_name("avireon-secrets")`
+- 用 CLI 创建了占位密钥集 `avireon-secrets`（含 RUNWAY_API_KEY/AGNES_API_KEY 两个空键）:
+  `modal secret create avireon-secrets RUNWAY_API_KEY="" AGNES_API_KEY=""`
+- **注意**: Modal Secrets 改动不会自动生效，必须在控制台填入真实 key 后重新 `modal deploy`
+
+#### 4. OpenRouter 模型池更新 (`config.py` + `ai_scheduler.py` 注释)
+- 用户提供 OpenRouter 官方最新免费模型列表，先用 `curl openrouter.ai/api/v1/models` 拉取 337 个模型验证 slug，再更新
+- chat 池新增 `google/gemma-4-31b-it:free`；修正 `google/gemma-4-26b-a4b-it:free`（补 `-it`）、`inclusionai/ling-3.0-flash:free`（原 `ling/...`）
+- code 池移除已下架的 `qwen/qwen3-coder:free`，保留 `cohere/north-mini-code:free`
+- multimodal 修正 `nvidia/nemotron-nano-12b-v2-vl:free`（原 `-12b-2-vl`）
+- other 池移除失效 `lagoon/laguna-2.1:free`，修正为 `poolside/laguna-s-2.1:free`、`poolside/laguna-xs-2.1:free`
+- rerank 升级为 `nvidia/llama-nemotron-rerank-vl-1b-v2:free`
+- **结果**: 8 组 16 个唯一免费模型，无重复、无残留旧 slug
+- **说明**: rerank VL 1B V2 / Embed VL 1B V2 当前不在 OpenRouter 可用免费列表（可能已下架），保留配置无碍（调用失败自动降级）
+
+### 密钥
+- `avireon-secrets`（Modal 控制台）: RUNWAY_API_KEY、AGNES_API_KEY 仍为占位/空值，**用户计划自行填入真实 key**，填后需重新部署生效
+- OpenRouter key / SiliconFlow key: 配置于 `ai-service/.env`（已 gitignore），Modal 侧分别存于 secrets `openrouter-key` / `siliconflow-key`。**不要在任何可提交文件中写入真实 key**（GitHub push protection 会拦截）
+
+### 待办/未完成
+1. **提交并推送今天的改动**（当前工作目录有大量未提交改动，见下方清单）
+2. **Modal 控制台填入 RUNWAY_API_KEY / AGNES_API_KEY** 到 `avireon-secrets` 并保存
+3. **用户自行测试接口**（用户已明确表示部署完毕自己测）
+4. 音乐生成慢（LLM 歌词生成 5-18s 属真实 AI 调用耗时，非 bug）
+5. 模板/画面前端展示已可达（navbar 加了 Templates 入口），待用户实测
+
+### 当前 Git 状态（未提交改动清单）
+- modified: `ai-service/.env.example`、`app/config.py`、`app/i18n.py`、`app/main.py`、`app/routes/ai/lyrics.py`、`app/routes/ai/music.py`、`app/routes/ai/mv.py`、`app/services/agnes_music_service.py`、`app/services/ai_scheduler.py`、`app/templates/base.html`、`app/templates/components/navbar.html`、`app/templates/pages/create.html`、`app/templates/pages/settings.html`
+- untracked: `ai-service/.modalignore`、`ai-service/app/core/`、`ai-service/app/services/ai/`、`ai-service/app/startup_check.py`、`ai-service/modal_server.py`
+- `.env` 已 gitignore 不入库
+- 最近 3 个已推送提交: `6e7ffb7`(OpenRouter models + Agnes fallback + Runway client)、`ab14616`(async concurrency)、`fd01834`(MV max_tokens 1500->800)
