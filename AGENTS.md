@@ -589,3 +589,33 @@
 2. **Runway key**：`.env` 里仍是占位符，用户需提供真实 key 才能做动态 MV
 3. **Mureka/HF key** 可选：配置后音乐从 Mock 音频升级为真实生成
 4. 5 语言 + Templates 已全量上线，用户可实测页面
+
+---
+
+## 会话记录 (2026-08-04)
+
+### 已完成工作
+
+#### 1. 密钥复核（无新配置）
+- 用户重申 OPENROUTER / SILICONFLOW key，与 `ai-service/.env` 已存完全一致（无需改动）
+- 本地连通性复测：SiliconFlow `HTTP 000`（网络层不通）、OpenRouter `HTTP 200` → 结论不变，SiliconFlow 平台侧 403 仍阻塞
+
+#### 2. MV 生成并发化优化（commit `d46250a`）
+- **`_MAX_VIDEO_CONCURRENCY` 1 → 2**：Runway 视频片段从串行变并发（4 场景 480s → ~240s，省一半）
+- **mv.py 新增全局 `_http = httpx.AsyncClient(timeout=120, connect=15)`**：替换每段视频下载时 `httpx.AsyncClient()` 重复握手（第 235 行）
+- **runway_client.py `wait_for_task`**：`asyncio.get_event_loop()` → `asyncio.get_running_loop()`（修复 Python 3.10+ deprecation）
+- **本地验证**：临时 asyncio 测试确认 SDXL 4 图 gather 限流正确（max_active=2）、视频 gather 4 任务 sem=2 时序正确（~110ms vs 串行 200ms）、RunwayClient 导入正常（`is_configured=False` 因无 key）
+- 注: SDXL 生图并发（`_image_sem=2` + gather）与 Runway 提交并发（`_video_sem=2`）已在 `ab14616` 部分落地，本次将视频并发从 1 提到 2
+
+### 阻塞项（不变，需用户 key）
+1. **SiliconFlow key**（平台 403 + 本地网络不通）→ 需用户在 siliconflow.cn 控制台核实
+2. **Runway key**（`.env` 占位符）→ 有 key 才能出动态 MV 镜头
+3. **Mureka/HF key** → 有 key 才能出真实音频（现在 Mock）
+
+### 待办（下一步）
+- **`/create` 页展示 6 套内置模板选择器**（模板数据已有，前端未对接）
+- 后续可推进：MV 动态镜头优化（需 Runway key）
+
+### 当前 Git 状态
+- 最新提交: `d46250a` - "perf(mv): video concurrency 1->2 + reuse httpx client + fix get_event_loop deprecation"（已推送）
+- 工作目录干净（AGENTS.md 待提交）
