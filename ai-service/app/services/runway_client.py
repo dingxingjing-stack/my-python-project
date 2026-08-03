@@ -71,7 +71,8 @@ class RunwayClient:
     async def wait_for_task(
         self, task_id: str, timeout: int = 600, interval: int = 5
     ) -> Dict[str, Any]:
-        deadline = asyncio.get_event_loop().time() + timeout
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
         while True:
             detail = await self.get_task(task_id)
             status = detail.get("status")
@@ -80,7 +81,7 @@ class RunwayClient:
                 return detail
             if status in ("FAILED", "CANCELED"):
                 raise RuntimeError(f"Runway task {task_id} -> {status}")
-            if asyncio.get_event_loop().time() > deadline:
+            if loop.time() > deadline:
                 raise TimeoutError("Runway generation timed out")
             await asyncio.sleep(interval)
 

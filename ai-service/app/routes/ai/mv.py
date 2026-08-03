@@ -28,9 +28,12 @@ router = APIRouter(prefix="/ai", tags=["ai-mv"])
 
 # 并发信号量 — 防止第三方 AI 接口被大量并发请求打爆
 _MAX_IMAGE_CONCURRENCY = 2
-_MAX_VIDEO_CONCURRENCY = 1
+_MAX_VIDEO_CONCURRENCY = 2
 _image_sem = asyncio.Semaphore(_MAX_IMAGE_CONCURRENCY)
 _video_sem = asyncio.Semaphore(_MAX_VIDEO_CONCURRENCY)
+
+# 全局复用下载客户端（避免每段视频重复握手）
+_http = httpx.AsyncClient(timeout=httpx.Timeout(120, connect=15))
 
 
 @router.post("/mv/generate")
@@ -232,7 +235,7 @@ async def _generate_mv_from_lyrics(
                         else:
                             video_url = ""
                         if video_url:
-                            resp = await httpx.AsyncClient().get(video_url, timeout=120)
+                            resp = await _http.get(video_url)
                             return storage.save_video(resp.content, ext="mp4")
             except Exception:
                 pass
