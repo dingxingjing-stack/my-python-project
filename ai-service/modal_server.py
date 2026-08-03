@@ -191,3 +191,13 @@ def doctor():
                {"model": "Qwen/Qwen2.5-VL-7B-Instruct", "prompt": "a cat walking"})
     else:
         print("  [SF] SILICONFLOW_API_KEY EMPTY, skip probe")
+
+    # ── 关键域名连通性（判断第三方服务可用性） ──
+    import socket as _sock
+    for probe_host in ["api-inference.huggingface.co", "api.siliconflow.cn",
+                       "api.mureka.ai", "www.soundhelix.com", "openrouter.ai"]:
+        try:
+            ip = _sock.getaddrinfo(probe_host, 443, proto=_sock.IPPROTO_TCP)
+            print(f"  [DNS] {probe_host} -> {ip[0][4][0]}")
+        except Exception as e:
+            print(f"  [DNS] {probe_host} -> FAIL {type(e).__name__}: {e}")
