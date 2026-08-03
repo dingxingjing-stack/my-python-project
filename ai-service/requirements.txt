@@ -38,6 +38,9 @@ boto3==1.35.86
 # LLM SDKs
 openai==1.58.1
 
+# Modal GPU client (Function.lookup at runtime)
+modal==1.5.3
+
 # Rate limiting
 slowapi==0.1.9
 

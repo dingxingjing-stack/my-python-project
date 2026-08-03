@@ -596,7 +596,7 @@
 
           const poll = setInterval(async () => {
             try {
-              const statusRes = await fetch(`/api/v1/ai/job/${jobId}`);
+              const statusRes = await fetch(`/api/v1/ai/mv/job/${jobId}`);
               const status = await statusRes.json();
               this.mvProgress = status.progress || 0;
 

@@ -1,10 +1,14 @@
-"""AI MV 视频全流程 — V2.0 纯本地方案。
+"""AI MV 视频全流程 — V3.0 三层降级异步方案。
 
 链路：
 1. Nemotron 生成故事剧本 + 分镜 JSON
-2. 硅基 SDXL 为每帧分镜生成静态图片
-3. Runway 将静态图片转动态视频片段
+2. 硅基 SDXL 为每帧分镜生成静态图片（兜底视觉素材）
+3. 三层降级动态视频：Agnes 免费视频 → Modal CogVideoX → FFmpeg 幻灯片
+   背景音乐：Modal MusicGen → SoundHelix 免费背景音乐
 4. FFmpeg 拼接动态片段 + 音频 + 字幕 → 成品 MV
+
+任务采用异步 job 模式：POST /ai/mv/generate 立即返回 job_id，
+前端轮询 GET /ai/mv/job/{job_id} 获取进度与结果。
 """
 from __future__ import annotations
 
@@ -16,7 +20,6 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-import httpx
 from fastapi import APIRouter, HTTPException, Request
 
 from app.database import get_db
@@ -28,31 +31,70 @@ router = APIRouter(prefix="/ai", tags=["ai-mv"])
 
 # 并发信号量 — 防止第三方 AI 接口被大量并发请求打爆
 _MAX_IMAGE_CONCURRENCY = 2
-_MAX_VIDEO_CONCURRENCY = 2
 _image_sem = asyncio.Semaphore(_MAX_IMAGE_CONCURRENCY)
-_video_sem = asyncio.Semaphore(_MAX_VIDEO_CONCURRENCY)
 
-# 全局复用下载客户端（避免每段视频重复握手）
-_http = httpx.AsyncClient(timeout=httpx.Timeout(120, connect=15))
+
+# 内存任务存储（与 music.py 的 job 轮询模式一致）
+_mv_job_store: dict[str, dict] = {}
+
+
+def _mv_status_dir() -> Path:
+    """跨容器状态目录 = data/mv_jobs（共享卷上，规避 SQLite 跨容器 WAL 不可靠）。"""
+    from app.services.local_storage import get_local_storage
+    base = get_local_storage()._base  # .../data/uploads
+    d = base.parent / "mv_jobs"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _write_job_status(job_id: str, payload: dict) -> None:
+    """将任务状态写成 JSON 文件（共享卷）。Modal 卷对整文件写入/替换一致性良好。"""
+    try:
+        p = _mv_status_dir() / f"{job_id}.json"
+        tmp = p.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(p)
+    except Exception as exc:
+        print(f"[MV] 状态文件写失败 job={job_id}: {exc}", flush=True)
+
+
+def _read_job_status_file(job_id: str) -> dict | None:
+    """读取共享卷上的任务状态文件（跨容器轮询的主通道）。"""
+    try:
+        p = _mv_status_dir() / f"{job_id}.json"
+        if not p.exists():
+            return None
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
 
 @router.post("/mv/generate")
 @require_feature("ai_mv_simple")
 async def generate_mv_full(request: Request):
-    """MV 全流程生成 — 分镜→生图→动态→合成，扣 20 Credits。"""
+    """MV 全流程生成 — 异步任务，立即返回 job_id，前端轮询 /ai/mv/job/{job_id}。
+
+    三层降级：Agnes 免费视频 → Modal CogVideoX → FFmpeg 幻灯片；
+    音乐：Modal MusicGen → SoundHelix 免费背景音乐。
+    """
     req = await request.json()
     user_id = req.get("user_id", 1)
     lyrics = req.get("lyrics", "")
     title = req.get("title", "Untitled")
     mv_style = req.get("style", "Cinematic")
-    num_scenes = req.get("num_scenes", 1)
+    num_scenes = int(req.get("num_scenes", 1) or 1)
     creation_id = req.get("creation_id")
 
     if not lyrics:
         raise HTTPException(400, "Missing lyrics")
 
-    scheduler = get_scheduler()
     job_id = str(uuid.uuid4())[:8]
+    _mv_job_store[job_id] = {
+        "status": "queued",
+        "progress": 0,
+        "result": None,
+        "error": None,
+    }
 
     db = await get_db()
     await db.execute(
@@ -61,7 +103,101 @@ async def generate_mv_full(request: Request):
     )
     await db.commit()
 
+    # 优先用 Modal 独立函数容器执行（容器存活=任务运行期，避免 web 容器回收打断）
+    spawned = _spawn_modal_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id)
+    if not spawned:
+        asyncio.create_task(_run_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id))
+
+    return {"job_id": job_id}
+
+
+def _spawn_modal_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id) -> bool:
+    """尝试通过 Modal Function.from_name spawn 后台任务；失败返回 False 走本地 asyncio。"""
     try:
+        import modal
+        fn = modal.Function.from_name("avireon-ai-music", "run_mv_job")
+        fn.spawn(
+            job_id=job_id,
+            user_id=user_id,
+            lyrics=lyrics,
+            title=title,
+            mv_style=mv_style,
+            num_scenes=num_scenes,
+            creation_id=creation_id,
+        )
+        print(f"[MV] job={job_id} 已通过 Modal 独立容器后台执行", flush=True)
+        return True
+    except Exception as exc:
+        print(f"[MV] Modal spawn 失败（本地/降级）: {type(exc).__name__}: {exc}", flush=True)
+        return False
+
+
+@router.get("/mv/job/{job_id}")
+async def get_mv_job_status(job_id: str):
+    """查询 MV 生成任务状态 — 前端轮询用。
+
+    优先级：共享卷状态文件（跨容器最可靠）→ SQLite → 内存 store。
+    """
+    # 1) 共享卷状态文件（Modal 独立容器写入，web 容器读取）
+    file_status = _read_job_status_file(job_id)
+    if file_status:
+        return {"job_id": job_id, **file_status}
+
+    # 2) SQLite 兜底
+    db = await get_db()
+    cur = await db.execute(
+        "SELECT status, error_message, ai_response, model_name FROM generation_jobs WHERE job_id=? ORDER BY id DESC LIMIT 1",
+        (job_id,),
+    )
+    row = await cur.fetchone()
+    if row:
+        status = row["status"]
+        if status == "completed":
+            video_url = row["ai_response"] or ""
+            return {
+                "job_id": job_id,
+                "status": "completed",
+                "progress": 100,
+                "result": {"video_url": video_url} if video_url else None,
+                "error": None,
+            }
+        if status == "failed":
+            return {
+                "job_id": job_id,
+                "status": "failed",
+                "progress": 100,
+                "result": None,
+                "error": row["error_message"],
+            }
+        return {
+            "job_id": job_id,
+            "status": status,
+            "progress": 50,
+            "result": None,
+            "error": None,
+        }
+
+    # 3) 内存 store 兜底（本地 asyncio 模式）
+    job = _mv_job_store.get(job_id)
+    if job:
+        return {"job_id": job_id, **job}
+    raise HTTPException(404, "Job not found")
+
+
+async def _run_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id):
+    """后台任务：跑完整 MV 生成链路，结果写入内存 store + SQLite（供跨容器轮询）。
+
+    可能运行于本地 asyncio.create_task（内存 store 已初始化）或 Modal 独立容器
+    （内存 store 为空），因此先补一个本地 store 条目，最终以 SQLite 为准。
+    """
+    if job_id not in _mv_job_store:
+        _mv_job_store[job_id] = {"status": "queued", "progress": 0, "result": None, "error": None}
+    _mv_job_store[job_id]["status"] = "processing"
+    _mv_job_store[job_id]["progress"] = 5
+    _write_job_status(job_id, {"status": "processing", "progress": 5, "result": None, "error": None})
+    t0 = asyncio.get_running_loop().time()
+    try:
+        scheduler = get_scheduler()
         video_url = await _generate_mv_from_lyrics(
             lyrics=lyrics,
             title=title,
@@ -72,23 +208,46 @@ async def generate_mv_full(request: Request):
             scheduler=scheduler,
             job_id=job_id,
         )
-
-        return {
-            "success": True,
-            "data": {
-                "job_id": job_id,
-                "video_url": video_url,
-                "note": "MV generated via SDXL + Runway + FFmpeg",
-            },
+        _mv_job_store[job_id] = {
+            "status": "completed",
+            "progress": 100,
+            "result": {"video_url": video_url},
+            "error": None,
         }
-
+        _write_job_status(job_id, _mv_job_store[job_id])
+        # 结果写入 SQLite，供跨容器轮询
+        try:
+            db = await get_db()
+            await db.execute(
+                "UPDATE generation_jobs SET status='completed', ai_response=?, elapsed_ms=? WHERE job_id=?",
+                (video_url, int((asyncio.get_running_loop().time() - t0) * 1000), job_id),
+            )
+            await db.commit()
+        except Exception as exc:
+            print(f"[MV] 结果写库失败: {exc}", flush=True)
     except Exception as exc:
-        await db.execute(
-            "UPDATE generation_jobs SET status='failed', error_message=? WHERE job_id=?",
-            (str(exc)[:500], job_id),
-        )
-        await db.commit()
-        raise HTTPException(500, f"MV generation failed: {exc}")
+        print(f"[MV] job={job_id} 异常: {type(exc).__name__}: {exc}", flush=True)
+        import traceback as _tb
+        _tb.print_exc()
+        _mv_job_store[job_id] = {
+            "status": "failed",
+            "progress": 100,
+            "result": None,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+        _write_job_status(job_id, _mv_job_store[job_id])
+        try:
+            db = await get_db()
+            await db.execute(
+                "UPDATE generation_jobs SET status='failed', error_message=? WHERE job_id=?",
+                (str(exc)[:500], job_id),
+            )
+            await db.commit()
+        except Exception:
+            pass
+    finally:
+        dur = int((asyncio.get_running_loop().time() - t0) * 1000)
+        print(f"[MV] job={job_id} status={_mv_job_store[job_id].get('status')} elapsed={dur}ms", flush=True)
 
 
 @router.post("/mv/regenerate-scene")
@@ -174,7 +333,7 @@ async def _generate_mv_from_lyrics(
     scheduler=None,
     job_id: str = "",
 ) -> str:
-    """完整 MV 链路：分镜 → SDXL 生图 → Runway → FFmpeg 合成。"""
+    """完整 MV 链路：分镜 → SDXL 生图 → 三层降级动态视频 + 音乐 → FFmpeg 合成。"""
     if scheduler is None:
         from app.services.ai_scheduler import get_scheduler
         scheduler = get_scheduler()
@@ -188,7 +347,7 @@ async def _generate_mv_from_lyrics(
     )
     scenes = _parse_storyboard(storyboard_result.text)
 
-    # Step 2: 硅基 SDXL 为每帧分镜生图（并发执行，节省 75% 时间）
+    # Step 2: 硅基 SDXL 为每帧分镜生图（兜底视觉素材，失败不影响主链路）
     async def _gen_one_image(i_scene):
         i, scene = i_scene
         async with _image_sem:
@@ -209,90 +368,33 @@ async def _generate_mv_from_lyrics(
     scene_images = await asyncio.gather(*[_gen_one_image(is_) for is_ in enumerate(scenes)])
     scene_images = list(scene_images)
 
-    # Step 3: 动态视频（Agnes 免费视频优先 → Runway 兜底 → 图片 slideshow）
-    from app.services.agnes_video_client import get_agnes_video_client
-    agnes = get_agnes_video_client()
+    # Step 3: 三层降级动态视频 + 背景音乐（走 MV 调度器）
+    from app.services.mv_scheduler import get_mv_scheduler
+    mv_sched = get_mv_scheduler()
 
-    async def _gen_one_agnes_video(scene):
-        """用 Agnes 免费视频 API 从分镜 prompt 直接生成动态视频。"""
-        prompt = scene.get("image_prompt", "") or scene.get("description", "")
-        if not prompt:
-            return None
-        async with _video_sem:
-            try:
-                task = await agnes.text_to_video(prompt=f"{mv_style}: {prompt}", duration=5)
-                video_id = task.get("video_id") or task.get("id", "")
-                if not video_id:
-                    return None
-                result = await agnes.wait_for_task(video_id, timeout=300)
-                video_url = agnes.extract_video_url(result)
-                if video_url:
-                    resp = await _http.get(video_url)
-                    if resp.status_code == 200 and resp.content:
-                        return storage.save_video(resp.content, ext="mp4")
-            except Exception:
-                pass
-            return None
+    # 3a. 每场景生成动态视频片段（Agnes → Modal CogVideoX → None 走幻灯片兜底）
+    scene_video_results = await asyncio.gather(*[
+        mv_sched.generate_scene_video(sc, mv_style, storage, idx)
+        for idx, sc in enumerate(scenes)
+    ])
+    video_segments = [r[0] for r in scene_video_results if r[0]]
+    video_channels = [r[1] for r in scene_video_results if r[1] != "none"]
+    if video_segments:
+        print(f"[MV] 动态镜头 {len(video_segments)} 个，通道={video_channels}")
 
-    # Step 3b: Runway 兜底（图片转动态）
-    from app.services.runway_client import get_runway_client
-    runway = get_runway_client()
+    # 3b. 背景音乐（MusicGen → SoundHelix）
+    audio_url, audio_channel = await mv_sched.generate_music(title, mv_style, storage)
+    if audio_url:
+        print(f"[MV] 背景音乐通道={audio_channel}")
 
-    async def _gen_one_runway_video(img_url):
-        if not img_url:
-            return None
-        async with _video_sem:
-            try:
-                if runway.is_configured:
-                    task = await runway.image_to_video(
-                        start_image=img_url,
-                        prompt=f"{mv_style} scene, cinematic motion",
-                        duration=5,
-                    )
-                    task_id = task.get("id", "")
-                    if task_id:
-                        result = await runway.wait_for_task(task_id, timeout=120)
-                        video_url = (result.get("output") or [{}])
-                        if isinstance(video_url, list):
-                            video_url = video_url[0].get("url") if video_url and isinstance(video_url[0], dict) else ""
-                        elif isinstance(video_url, dict):
-                            video_url = video_url.get("url", "")
-                        else:
-                            video_url = ""
-                        if video_url:
-                            resp = await _http.get(video_url)
-                            if resp.status_code == 200 and resp.content:
-                                return storage.save_video(resp.content, ext="mp4")
-            except Exception:
-                pass
-            return None
-
-    # Agnes 优先：为每个分镜直接生成动态视频（无需图片）
-    # 注意：Agnes 免费层限速 1 任务/60s，这里串行执行（并发只会排队等待，无收益）
-    # 且限速下每场景约 1-2 分钟，最多处理 2 个场景，避免超时挂起
-    if agnes.is_configured:
-        video_segments = []
-        for sc in scenes[:2]:
-            seg = await _gen_one_agnes_video(sc)
-            if seg:
-                video_segments.append(seg)
-        if video_segments:
-            print(f"[MV] Agnes 生成 {len(video_segments)}/{min(len(scenes), 2)} 个动态镜头")
-    else:
-        video_segments = []
-
-    # 如果 Agnes 没产出（无 key/失败），回退 Runway + 图片 slideshow
-    if not video_segments:
-        video_segments_raw = await asyncio.gather(*[_gen_one_runway_video(u) for u in scene_images])
-        video_segments = [seg for seg in video_segments_raw if seg]
-
-    # Step 4: FFmpeg 合成最终 MV
+    # Step 4: FFmpeg 合成最终 MV（含音频 mux）
     final_video_url = await _compose_mv(
         scene_images=scene_images,
         video_segments=video_segments,
         lyrics=lyrics,
         style=mv_style,
         storage=storage,
+        audio_url=audio_url,
     )
 
     # Step 5: 存入数据库
@@ -319,8 +421,9 @@ async def _compose_mv(
     lyrics: str,
     style: str,
     storage,
+    audio_url: Optional[str] = None,
 ) -> str:
-    """FFmpeg 合成：图片/视频 + 字幕 → 最终 MV。"""
+    """FFmpeg 合成：图片/视频 + 字幕 + 背景音乐 → 最终 MV。"""
     ffmpeg_available = True
     try:
         subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
@@ -330,11 +433,20 @@ async def _compose_mv(
     if not ffmpeg_available:
         return "/static/videos/placeholder.mp4"
 
+    # 背景音乐：解析 /uploads/... URL 为容器内路径
+    audio_fs_path = None
+    if audio_url:
+        if audio_url.startswith("/uploads/"):
+            ls_base = get_local_storage()._base
+            audio_fs_path = str(ls_base / audio_url[len("/uploads/"):])
+        elif audio_url.startswith("http"):
+            audio_fs_path = audio_url
+
     # 过滤空/无效图片 URL，仅保留有效路径
     scene_images = [u for u in (scene_images or []) if u and u.startswith("/uploads/")]
-    if not scene_images:
-        # 无 SDXL 图片时：用 FFmpeg 生成歌词文字幻灯片视频，保证 MV 可播放
-        return await _compose_text_mv(lyrics, style, storage)
+    if not scene_images and not video_segments:
+        # 无 SDXL 图片且无视频片段：用 FFmpeg 生成歌词文字幻灯片视频，保证 MV 可播放
+        return await _compose_text_mv(lyrics, style, storage, audio_url=audio_url)
 
     # 生成 SRT 字幕
     subtitle_file = None
@@ -388,10 +500,33 @@ async def _compose_mv(
             await proc.communicate()
             Path(image_list.name).unlink(missing_ok=True)
 
+        # 若存在背景音乐，将音频 mux 进视频（-shortest 截到视频长度）
+        if audio_fs_path and Path(output_path).exists() and Path(output_path).stat().st_size > 0:
+            try:
+                muxed = output_path + ".mux.mp4"
+                mux_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", output_path,
+                    "-i", audio_fs_path,
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-shortest",
+                    muxed,
+                ]
+                proc = await asyncio.create_subprocess_exec(*mux_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                await proc.communicate()
+                if Path(muxed).exists() and Path(muxed).stat().st_size > 0:
+                    Path(output_path).unlink(missing_ok=True)
+                    output_path = muxed
+                else:
+                    print("[MV] 音频 mux 失败，保留无声视频")
+            except Exception as exc:
+                print(f"[MV] 音频 mux 异常: {exc}")
+
         video_bytes = Path(output_path).read_bytes()
         if not video_bytes:
             print("[MV] FFmpeg 图片合成输出为空，回退到文字幻灯片 MV")
-            return await _compose_text_mv(lyrics, style, storage)
+            return await _compose_text_mv(lyrics, style, storage, audio_url=audio_url)
         return storage.save_video(video_bytes, ext="mp4")
     finally:
         try:
@@ -405,7 +540,7 @@ async def _compose_mv(
                 pass
 
 
-async def _compose_text_mv(lyrics: str, style: str, storage) -> str:
+async def _compose_text_mv(lyrics: str, style: str, storage, audio_url: Optional[str] = None) -> str:
     """无 SDXL 图片兜底：用 FFmpeg 生成歌词文字幻灯片视频，保证 MV 可播放。"""
     import re as _re
     lines = [l.strip() for l in lyrics.strip().splitlines() if l.strip()]
@@ -484,6 +619,34 @@ async def _compose_text_mv(lyrics: str, style: str, storage) -> str:
 
         for s in segments:
             Path(s).unlink(missing_ok=True)
+
+        # 存在背景音乐则 mux 进视频
+        if audio_url and Path(output_path).exists() and Path(output_path).stat().st_size > 0:
+            audio_fs_path = None
+            if audio_url.startswith("/uploads/"):
+                ls_base = get_local_storage()._base
+                audio_fs_path = str(ls_base / audio_url[len("/uploads/"):])
+            elif audio_url.startswith("http"):
+                audio_fs_path = audio_url
+            if audio_fs_path:
+                try:
+                    muxed = output_path + ".mux.mp4"
+                    mux_cmd = [
+                        "ffmpeg", "-y",
+                        "-i", output_path,
+                        "-i", audio_fs_path,
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-shortest",
+                        muxed,
+                    ]
+                    proc = await asyncio.create_subprocess_exec(*mux_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                    await proc.communicate()
+                    if Path(muxed).exists() and Path(muxed).stat().st_size > 0:
+                        Path(output_path).unlink(missing_ok=True)
+                        output_path = muxed
+                except Exception as exc:
+                    print(f"[MV][textslide] 音频 mux 异常: {exc}")
 
         video_bytes = Path(output_path).read_bytes()
         if not video_bytes:

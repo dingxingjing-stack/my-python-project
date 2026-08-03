@@ -10,3 +10,5 @@ downloads/
 *.db-wal
 *.db-shm
 data/*.db
+data/uploads/
+data/mv_jobs/
