@@ -282,8 +282,14 @@ async def _compose_mv(
     except (FileNotFoundError, subprocess.CalledProcessError):
         ffmpeg_available = False
 
-    if not ffmpeg_available or not scene_images:
+    if not ffmpeg_available:
         return "/static/videos/placeholder.mp4"
+
+    # 过滤空/无效图片 URL，仅保留有效路径
+    scene_images = [u for u in (scene_images or []) if u and u.startswith("/uploads/")]
+    if not scene_images:
+        # 无 SDXL 图片时：用 FFmpeg 生成歌词文字幻灯片视频，保证 MV 可播放
+        return await _compose_text_mv(lyrics, style, storage)
 
     # 生成 SRT 字幕
     subtitle_file = None
@@ -297,12 +303,22 @@ async def _compose_mv(
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
         output_path = tmp.name
 
+    def _to_fs_path(url: str) -> str:
+        """将 /uploads/... URL 转换为容器内绝对路径，供 FFmpeg 读取。"""
+        if url.startswith("/uploads/"):
+            # storage 保存目录 = ai-service/data/uploads
+            from app.services.local_storage import get_local_storage
+            ls_base = get_local_storage()._base
+            rel = url[len("/uploads/"):]
+            return str(ls_base / rel)
+        return url
+
     try:
         # 如果有 Runway 视频片段，用 concat；否则用图片 slideshow
         if video_segments:
             concat_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
             for seg in video_segments:
-                concat_file.write(f"file '{seg}'\n")
+                concat_file.write(f"file '{_to_fs_path(seg)}'\n")
             concat_file.close()
 
             cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_file.name]
@@ -316,7 +332,7 @@ async def _compose_mv(
             # 用图片生成 slideshow
             image_list = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
             for img in scene_images:
-                image_list.write(f"file '{img}'\nduration 5\n")
+                image_list.write(f"file '{_to_fs_path(img)}'\nduration 5\n")
             image_list.close()
 
             cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", image_list.name]
@@ -328,6 +344,9 @@ async def _compose_mv(
             Path(image_list.name).unlink(missing_ok=True)
 
         video_bytes = Path(output_path).read_bytes()
+        if not video_bytes:
+            print("[MV] FFmpeg 图片合成输出为空，回退到文字幻灯片 MV")
+            return await _compose_text_mv(lyrics, style, storage)
         return storage.save_video(video_bytes, ext="mp4")
     finally:
         try:
@@ -339,6 +358,97 @@ async def _compose_mv(
                 Path(subtitle_file).unlink(missing_ok=True)
             except Exception:
                 pass
+
+
+async def _compose_text_mv(lyrics: str, style: str, storage) -> str:
+    """无 SDXL 图片兜底：用 FFmpeg 生成歌词文字幻灯片视频，保证 MV 可播放。"""
+    import re as _re
+    lines = [l.strip() for l in lyrics.strip().splitlines() if l.strip()]
+    plain = []
+    for l in lines:
+        if _re.match(r"^(Title|LRC|Verse|Chorus|Bridge|Intro|Outro)\s*\d*:", l, flags=_re.IGNORECASE):
+            continue
+        plain.append(l)
+    if not plain:
+        plain = ["Avireon AI Music", "Your Song"]
+    pages = []
+    chunk = 3
+    for i in range(0, len(plain), chunk):
+        pages.append(plain[i:i + chunk])
+    if not pages:
+        pages = [["Avireon AI Music"]]
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        output_path = tmp.name
+
+    def _safe_text(t: str) -> str:
+        """清理 drawtext 特殊字符，防止 filter 语法被破坏。"""
+        import re as _r
+        t = _r.sub(r"[^A-Za-z0-9\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af .,!?\-_'\"()]", " ", t)
+        return t.strip().replace("'", "\\'").replace(":", "\\:")[:120]
+
+    try:
+        # 每页 5 秒，用纯色背景 + 白色文字生成视频帧
+        segments = []
+        for idx, page in enumerate(pages):
+            seg = f"{output_path}.{idx}.ts"
+            text = " | ".join(page)
+            text_safe = _safe_text(text)
+            if not text_safe:
+                text_safe = "Avireon AI Music"
+            drawtext = f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='{text_safe}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2"
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "lavfi", "-i", "color=c=0x1a1a2e:s=1280x720:d=5",
+                "-vf", drawtext,
+                "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+                seg,
+            ]
+            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            _, err = await proc.communicate()
+            if proc.returncode != 0:
+                print(f"[MV][textslide] 页面 {idx} FFmpeg 失败 rc={proc.returncode}: {err.decode(errors='replace')[:300]}")
+                continue
+            segments.append(seg)
+
+        if not segments:
+            print("[MV][textslide] 所有文字幻灯片生成失败，回退 placeholder")
+            return "/static/videos/placeholder.mp4"
+
+        if len(segments) == 1:
+            final = output_path
+            import shutil
+            shutil.copyfile(segments[0], final)
+        else:
+            concat_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
+            for s in segments:
+                concat_file.write(f"file '{s}'\n")
+            concat_file.close()
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "concat", "-safe", "0", "-i", concat_file.name,
+                "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+                output_path,
+            ]
+            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            _, err = await proc.communicate()
+            if proc.returncode != 0:
+                print(f"[MV][textslide] concat 失败 rc={proc.returncode}: {err.decode(errors='replace')[:300]}")
+                return "/static/videos/placeholder.mp4"
+            Path(concat_file.name).unlink(missing_ok=True)
+
+        for s in segments:
+            Path(s).unlink(missing_ok=True)
+
+        video_bytes = Path(output_path).read_bytes()
+        if not video_bytes:
+            return "/static/videos/placeholder.mp4"
+        return storage.save_video(video_bytes, ext="mp4")
+    finally:
+        try:
+            Path(output_path).unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def _parse_storyboard(text: str) -> list[dict]:

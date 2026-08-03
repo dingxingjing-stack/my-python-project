@@ -19,3 +19,4 @@ Include/
 *.db-wal
 *.db-shm
 logs/
+data/

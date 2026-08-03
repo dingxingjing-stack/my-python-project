@@ -19,7 +19,8 @@ class LocalStorage:
 
     def __init__(self, base_dir: str | None = None) -> None:
         if base_dir is None:
-            root = pathlib.Path(__file__).resolve().parent.parent  # ai-service/
+            # app/services/local_storage.py → parent.parent = ai-service/app，需再上溯一层到 ai-service/
+            root = pathlib.Path(__file__).resolve().parent.parent.parent
             base_dir = str(root / "data" / "uploads")
         self._base = pathlib.Path(base_dir)
         self._base.mkdir(parents=True, exist_ok=True)

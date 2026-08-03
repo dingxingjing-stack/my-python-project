@@ -7,6 +7,7 @@ REPO_ROOT = Path(__file__).parent
 
 # ── Image 构建阶段 ──
 # 注意: add_local_* 必须放在所有构建步骤末尾（Modal 要求）
+# ignore=["data/"] 排除本地 data 目录（SQLite DB + 上传文件），避免镜像非空目录挂载 Volume 冲突
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg")
@@ -15,10 +16,14 @@ image = (
     .add_local_dir(
         str(REPO_ROOT),
         remote_path="/root/ai-service",
+        ignore=["data/"],
     )
 )
 
 app = modal.App("avireon-ai-music")
+
+# 持久化存储卷 — 存放数据目录（SQLite 数据库 + 上传文件），跨容器共享、不被回收
+data_volume = modal.Volume.from_name("avireon-data-v2", create_if_missing=True)
 
 
 @app.function(
@@ -32,6 +37,7 @@ app = modal.App("avireon-ai-music")
         modal.Secret.from_name("siliconflow-key"),
         modal.Secret.from_name("avireon-secrets"),
     ],
+    volumes={"/root/ai-service/data": data_volume},
 )
 @modal.asgi_app()
 def web():
@@ -68,19 +74,39 @@ def web():
     return fastapi_app
 
 
-@app.function(image=image)
+@app.function(
+    image=image,
+    volumes={"/root/ai-service/data": data_volume},
+    secrets=[
+        modal.Secret.from_name("openrouter-key"),
+        modal.Secret.from_name("siliconflow-key"),
+        modal.Secret.from_name("avireon-secrets"),
+    ],
+)
 def doctor():
-    import sys, pathlib, importlib
+    import sys, pathlib, importlib, os
     pkg_root = "/root/ai-service"
     if pkg_root not in sys.path:
         sys.path.insert(0, pkg_root)
     importlib.invalidate_caches()
 
+    # 检查 Volume 挂载目录
     for rel in ["app", "app/models", "app/routers",
                 "app/routes", "app/routes/ai", "app/services"]:
         p = pathlib.Path(pkg_root) / rel / "__init__.py"
         sz = p.stat().st_size if p.exists() else -1
         print(f"  {p} size={sz}")
+
+    up = pathlib.Path("/root/ai-service/data/uploads")
+    print(f"  uploads exists={up.exists()} dir={up.is_dir()}")
+    if up.exists():
+        for sub in sorted(up.iterdir()):
+            n = sum(1 for _ in sub.iterdir()) if sub.is_dir() else 1
+            print(f"    {sub.name}: {n} files")
+            if sub.is_dir():
+                files = sorted(sub.iterdir())[:3]
+                for f in files:
+                    print(f"      {f.name} size={f.stat().st_size if f.is_file() else 'dir'}")
 
     try:
         import app.main
@@ -92,3 +118,20 @@ def doctor():
         print("  [OK] music")
     except Exception as e:
         print(f"  [FAIL] music -> {e}")
+    try:
+        import subprocess
+        r = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True, timeout=30)
+        print(f"  ffmpeg rc={r.returncode} head={r.stdout.splitlines()[0] if r.stdout else r.stderr[:120]}")
+    except Exception as e:
+        print(f"  [FAIL] ffmpeg -> {e}")
+    import pathlib as _pl
+    for fp in ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+               "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+               "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"]:
+        print(f"  font {fp} exists={_pl.Path(fp).exists()}")
+    import os
+    for k in ["SILICONFLOW_API_KEY", "OPENROUTER_API_KEY", "RUNWAY_API_KEY", "AGNES_API_KEY"]:
+        v = os.getenv(k, "")
+        print(f"  env {k} = {'<set len=' + str(len(v)) + '>' if v else '<EMPTY>'}")
+        if v:
+            print(f"    prefix={v[:8]}... suffix={v[-6:]}")

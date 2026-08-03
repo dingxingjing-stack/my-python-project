@@ -400,3 +400,57 @@
 - untracked: `ai-service/.modalignore`、`ai-service/app/core/`、`ai-service/app/services/ai/`、`ai-service/app/startup_check.py`、`ai-service/modal_server.py`
 - `.env` 已 gitignore 不入库
 - 最近 3 个已推送提交: `6e7ffb7`(OpenRouter models + Agnes fallback + Runway client)、`ab14616`(async concurrency)、`fd01834`(MV max_tokens 1500->800)
+
+---
+
+## 会话记录 (2026-08-03)
+
+### 已完成工作
+
+#### 1. 线上功能验证（全部通过）
+- `/health` → 200 `{"status":"ok","build":"2026-07-31-v4"}`
+- 模板库 `/api/v1/templates/list` → 6 套内置模板齐全（古风/流行/说唱/赛博朋克/治愈/短剧，含 SVG 封面/歌词模板/音乐/MV prompt）
+- `/api/v1/features` → stage=1，6 项开放（ai_music/ai_lyrics/ai_tts/ai_mv_simple/health/docs）
+- 5 语言翻译 `/api/v1/lang/translations` → 22.8KB，zh_CN/en/ja_JP/ko_KR/es_ES 全部在线
+- 歌词生成 POST `/api/v1/ai/lyrics` → 200，**OpenRouter 真实 AI 生成**（model=`nvidia/nemotron-3-nano-30b-a3b:free`，38.1s），非 Mock，证明线上 secrets 已生效
+
+#### 2. 修复 `local_storage.py` 路径错误（视频 404 根因）
+- **根因**: `app/services/local_storage.py:22` 用 `parent.parent` 定位根目录，但该文件在 `app/services/` 下，`parent.parent` 只到 `ai-service/app`，文件保存到 `app/data/uploads/`；而 `main.py`（在 `app/` 下）用 `parent.parent` 正确到 `ai-service/`，StaticFiles 挂载 `data/uploads`。**两边路径不一致 → 生成文件永远 404**
+- **修复**: `local_storage.py` 改为 `parent.parent.parent`，本地验证 MATCH=True
+
+#### 3. Modal 无状态容器丢文件 → 挂载持久化卷
+- **问题**: 本地文件存储在容器回收后丢失；视频 404 的另一因素
+- **修复** (`modal_server.py`):
+  - `data_volume = modal.Volume.from_name("avireon-data-v2", create_if_missing=True)`（新版 Modal 不再用 NetworkFileSystem，用 Volume）
+  - `web()` 和 `doctor()` 都挂载 `volumes={"/root/ai-service/data": data_volume}`
+  - `add_local_dir(..., ignore=["data/"])` 排除本地 data 目录（避免镜像非空目录无法挂卷，报 `cannot mount volume on non-empty path`）
+  - **注意**: 本 SDK 的 `add_local_dir` 用的是 `ignore` 参数（非旧的 `condition`，旧参数已移除）
+- **验证**: doctor 显示 video 文件已持久化到卷（`uploads/videos/xxx.mp4` 可见），下载从 404 → 200
+
+#### 4. MV 无生图兜底：文字幻灯片 MV (`mv.py`)
+- **根因链**: SiliconFlow key 线上 **403 Forbidden**（`/v1/chat/completions`）→ `generate_image_sdxl` 无降级失败 → scene_images 空 → FFmpeg 无输入 → 0 字节/坏链接
+- **修复** (`_compose_mv` + 新增 `_compose_text_mv`):
+  - 过滤空/无效图片 URL（仅保留 `/uploads/` 开头）
+  - 图片合成失败（0 字节）自动回退 `_compose_text_mv`
+  - `_compose_text_mv`: FFmpeg `color` + `drawtext`（DejaVuSans 字体）逐页生成歌词文字幻灯片 → concat 合成可播放 MV
+  - drawtext 文本安全过滤（`_safe_text`），特殊字符转义
+  - **本地验证**: 2 页 segment 生成 + concat 成功，输出 8457 字节可播放视频
+- **注意**: MV 每日限流 `daily_heavy_feature_calls=3` 测试期间已耗尽，端到端在线验证需次日
+
+### 关键诊断工具
+- `modal app logs avireon-ai-music` — 查看线上日志（无 `modal logs` 命令，需用 `modal app logs`）
+- `modal run modal_server.py::doctor` — doctor 函数已增强：检查 volume 目录/文件、ffmpeg 版本、字体路径、4 个密钥环境变量前缀/后缀（安全，不打印完整 key）
+
+### 密钥状态（线上实测）
+- `SILICONFLOW_API_KEY` = `sk-sgvf...zwocdg`（51字符）已注入但 **API 返回 403**（key 在平台侧无效/未实名/余额不足），需用户核实
+- `OPENROUTER_API_KEY` = `sk-or-v1...be91cd` 正常（歌词生成走 OR 成功）
+- `RUNWAY_API_KEY` / `AGNES_API_KEY` = **EMPTY**（avireon-secrets 占位未填）
+
+### 阻塞项
+1. **SiliconFlow key 403** → MV 无 AI 生成画面，只能出文字幻灯片版。需用户在 siliconflow.cn 核实 key 有效性（可能需实名/充值），填对后 Modal 控制台更新 `siliconflow-key` 并重新部署
+2. **RUNWAY_API_KEY / AGNES_API_KEY** 未填 → MV 无动态镜头、无 Agnes 音乐优化
+3. MV 每日 3 次限流已耗尽，端到端在线验证待次日
+
+### 当前 Git 状态
+- 最新提交: `ec390a2`（2026-08-02 多语言+MV修复+模型池）
+- 待提交: `ai-service/.modalignore`、`app/routes/ai/mv.py`、`app/services/local_storage.py`、`modal_server.py`
