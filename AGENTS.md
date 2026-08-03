@@ -564,3 +564,28 @@
 ### 当前 Git 状态
 - 最新提交: `beae795` - "feat(scheduler): PRIMARY_PROVIDER env to use OpenRouter directly, skip broken SiliconFlow"（已推送）
 - 工作目录干净
+
+---
+
+## 会话记录 (2026-08-03 收尾)
+
+### 密钥确认（用户重新提供，与 .env 已存完全一致）
+- 用户重申 `OPENROUTER_API_KEY`（sk-or-v1-5653...be91cd）与 `SILICONFLOW_API_KEY`（sk-sgvf...zwocdg），**与 `ai-service/.env` 中已保存的值一致，无需重新配置**，两者均已注入 Modal secrets
+- **`ai-service/.env` 是密钥权威来源**（已 gitignore 不入库），包含: OPENROUTER_API_KEY/SILICONFLOW_API_KEY/RUNWAY_API_KEY（占位符 your-runway-key-here）/INTERNAL_API_TOKEN
+- 教训: 之前用 grep 找 key 时正则只匹配了 `KEY=value`（无空格行）但实际失败，误判 .env 无 key；**排查 .env 应直接 Get-Content 或读全文，不要依赖窄正则**
+
+### SiliconFlow 本地连通性诊断（2026-08-03）
+- 本地 curl `https://api.siliconflow.cn/v1/models` → **HTTP 000**（连接层面失败，1.4s 超时，握手不上）
+- 对比 OpenRouter `https://openrouter.ai/api/v1/models` → **HTTP 200**（0.19s）
+- 结论: 用户本地网络访问 SiliconFlow 平台被阻断 + Modal（美国节点）返回 403 → key 在平台侧也被拒（未实名/禁用/过期）。**SiliconFlow 是国产平台，key 的有效性只能由用户在 siliconflow.cn 控制台核实**
+
+### 当前 Git 状态
+- 最新提交: `0039009` - "docs: session record 2026-08-03 night v2"（已推送）
+- 工作目录干净
+- Modal 已部署最新代码（beae795，含 avireon-config secret），`PRIMARY_PROVIDER=openrouter` 线上生效，生成链路 52s 完成
+
+### 明天待办
+1. **用户核实 SiliconFlow key**（siliconflow.cn 控制台实名/有效性），有效后 update `siliconflow-key` secret，如需可把 PRIMARY_PROVIDER 改回 siliconflow
+2. **Runway key**：`.env` 里仍是占位符，用户需提供真实 key 才能做动态 MV
+3. **Mureka/HF key** 可选：配置后音乐从 Mock 音频升级为真实生成
+4. 5 语言 + Templates 已全量上线，用户可实测页面
