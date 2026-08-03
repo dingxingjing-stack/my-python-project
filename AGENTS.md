@@ -523,3 +523,44 @@
 ### 当前 Git 状态
 - 最新提交: `b13179b` - "feat(i18n): 5-language switcher on homepage + console; Templates nav on all pages"（已推送）
 - 工作目录干净
+
+---
+
+## 会话记录 (2026-08-03 深夜 续)
+
+### 已完成工作
+
+#### 1. 全量线上验证通过（commit `beae795` 前）
+- `/api/v1/features` → 200，stage=1 开放 6 项（ai_music/ai_lyrics/ai_tts/ai_mv_simple/health/docs）
+- explore/library/settings/admin 页面全部 200
+- `/api/v1/explore`、`/api/v1/admin/dashboard`、`/api/v1/admin/jobs` → 200 数据正常（1 用户、4 任务全 completed）
+- 5 语言切换器覆盖全部核心页面（settings/explore 含 ja/ko/es 下拉选项）
+
+#### 2. 服务商优先级开关 PRIMARY_PROVIDER（commit `beae795`）
+- **背景**: SiliconFlow key 无效（403 + 网络挂起），每次 TEXT/CODE 任务白等 45s ConnectTimeout 才降级 OpenRouter，生成 133s
+- **实现**:
+  - `config.py` 新增 `primary_provider: str = "siliconflow"`（默认本地）
+  - `ai_scheduler.py`: 根据 `primary_provider` 动态构建 TEXT/CODE 路由。`openrouter` 时 primary=OR、fallback=None（不再回退无效 siliconflow）；`siliconflow` 时保持原有 OR fallback
+  - `modal_server.py`: 挂载新 secret `avireon-config`（含 `PRIMARY_PROVIDER=openrouter MOCK_FALLBACK=true FEATURE_STAGE=1`，用 `modal secret create avireon-config ...` 创建）
+- **验证**: 线上生成链路从 133s → **52s**（`[primary] openrouter 调用成功`，直接走 OR，无 ConnectTimeout 等待）
+- **本地验证**: 两种模式 route 构建正确（OR-first 和 SF-first）
+
+### 密钥状态（用户授权配置但无新 key，沿用现有）
+- `openrouter-key` → 有效（PRIMARY_PROVIDER=openrouter 已注入）
+- `siliconflow-key` → 平台 403，已降级为不用
+- `avireon-secrets` → RUNWAY/AGNES 仍空
+- `avireon-config` → 新建，PRIMARY_PROVIDER=openrouter
+- **注意**: Modal secret 无 update 命令，只能 delete+create 或新建。真实 key 仍待用户提供
+
+### 当前线上状态
+- 音乐生成: OpenRouter 真实歌词（52s）→ Mock 音频（Mureka/HF 无 key）
+- 全部核心页面 5 语言 + Templates 导航
+
+### 阻塞项（需用户提供真实 key）
+1. **SiliconFlow key**（平台 403）→ 需用户在 siliconflow.cn 核实/更换，然后 update `siliconflow-key` 并把 PRIMARY_PROVIDER 改回 siliconflow
+2. **Mureka/HF key** 未配置 → 音乐只能出 Mock 音频
+3. **RUNWAY/AGNES key** 空 → MV 无动态镜头
+
+### 当前 Git 状态
+- 最新提交: `beae795` - "feat(scheduler): PRIMARY_PROVIDER env to use OpenRouter directly, skip broken SiliconFlow"（已推送）
+- 工作目录干净
