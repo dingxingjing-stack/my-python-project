@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, AsyncGenerator, Optional
 
@@ -19,6 +20,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+import httpx
 
 from app.config import get_settings
 from app.models.schemas import LyricsRequest
@@ -64,7 +67,7 @@ LRC:
 # ---------------------------------------------------------------------------
 
 _RETRY_ARGS = dict(
-    stop=stop_after_attempt(3),
+    stop=stop_after_attempt(2),
     wait=wait_exponential(multiplier=2, min=2, max=8),
     retry=retry_if_exception_type(Exception),
     reraise=True,
@@ -98,7 +101,11 @@ class LLMClient:
         for name, key, base, model in _build_provider_map():
             if not key or not model:
                 continue
-            self._clients[name] = AsyncOpenAI(base_url=base.rstrip("/") + "/v1", api_key=key)
+            self._clients[name] = AsyncOpenAI(
+                base_url=base.rstrip("/") + "/v1",
+                api_key=key,
+                timeout=httpx.Timeout(60, connect=15),
+            )
             self._model_map[name] = model
             logger.info("LLMClient: {} → base={} model={}", name, base, model)
 
@@ -128,7 +135,10 @@ class LLMClient:
         if response_format:
             kwargs["response_format"] = response_format
         logger.debug("LLM chat | provider={} model={}", provider, model)
-        resp = await client.chat.completions.create(**kwargs)
+        resp = await asyncio.wait_for(
+            client.chat.completions.create(**kwargs),
+            timeout=45,
+        )
         return resp.choices[0].message.content or ""
 
     # ------------------------------------------------------------------
@@ -145,12 +155,15 @@ class LLMClient:
     ) -> AsyncGenerator[str, None]:
         client, model = self._resolve(provider)
         logger.debug("LLM stream | provider={} model={}", provider, model)
-        stream = await client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            stream=True,
+        stream = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            ),
+            timeout=45,
         )
         async for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None

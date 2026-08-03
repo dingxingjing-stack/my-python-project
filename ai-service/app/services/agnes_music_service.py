@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import os
 from typing import Optional
 
@@ -90,39 +91,50 @@ class AgnesMusicService:
             "Format: OPTIMIZED_PROMPT: ...\n---\nLYRICS: ..."
         )
         user_prompt = f"Style: {req.style}\nPrompt: {req.prompt}\nDuration: {req.duration}s"
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
         try:
-            if self._llm.available_providers():
-                result = await self._llm.complete(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
+            from app.services.ai_scheduler import AIScheduler, AITaskType
+            scheduler = AIScheduler()
+            result = await asyncio.wait_for(
+                scheduler.dispatch(
+                    AITaskType.TEXT,
+                    messages,
+                    temperature=0.7,
                     max_tokens=1024,
-                )
-            else:
-                return AgnesResult(success=False, error="No LLM provider", optimized_prompt=req.prompt)
-            text = (result or "").strip()
-            optimized = req.prompt
-            lyrics = ""
-
-            if "OPTIMIZED_PROMPT:" in text:
-                parts = text.split("OPTIMIZED_PROMPT:")
-                if len(parts) > 1:
-                    rest = parts[1].strip()
-                    if "---" in rest:
-                        optimized = rest.split("---")[0].strip()
-                        lyrics_part = rest.split("---", 1)[1]
-                        if "LYRICS:" in lyrics_part:
-                            lyrics = lyrics_part.split("LYRICS:", 1)[1].strip()
-                    else:
-                        optimized = rest
-
-            return AgnesResult(
-                success=True,
-                optimized_prompt=optimized,
-                generated_lyrics=lyrics,
+                    disable_fallback=False,
+                ),
+                timeout=180,
             )
+            text = (result.text or "").strip()
+            if not text:
+                return AgnesResult(success=False, error=result.error or "empty LLM response", optimized_prompt=req.prompt)
         except Exception as e:
-            print(f"[Agnes] LLM 降级失败: {e}")
+            print(f"[Agnes] LLM 降级失败: {type(e).__name__}: {e}")
             return AgnesResult(success=False, error=str(e), optimized_prompt=req.prompt)
+
+        optimized = req.prompt
+        lyrics = ""
+
+        if "OPTIMIZED_PROMPT:" in text:
+            parts = text.split("OPTIMIZED_PROMPT:")
+            if len(parts) > 1:
+                rest = parts[1].strip()
+                if "---" in rest:
+                    optimized = rest.split("---")[0].strip()
+                    lyrics_part = rest.split("---", 1)[1]
+                    if "LYRICS:" in lyrics_part:
+                        lyrics = lyrics_part.split("LYRICS:", 1)[1].strip()
+                else:
+                    optimized = rest
+
+        return AgnesResult(
+            success=True,
+            optimized_prompt=optimized,
+            generated_lyrics=lyrics,
+        )
 
 
 agnes_service = AgnesMusicService()

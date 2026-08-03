@@ -106,6 +106,12 @@ _FEATURE_RATE_TIER: dict[str, str] = {
     "ai_mv_simple":    "light",
     "health":          "light",
     "docs":            "light",
+    # scheduler 内部 action 一律轻量（不占用重型额度）
+    "text":            "light",
+    "code":            "light",
+    "long":            "light",
+    "code_alt":        "light",
+    "vision":          "light",
     # heavy — 重型高算力，严格限流
     "voice_clone":     "heavy",
     "remix":           "heavy",
@@ -145,8 +151,11 @@ def _current_stage() -> int:
 
 
 def rate_tier(feature: str) -> str:
-    """返回功能限流等级：'light'（轻量）/ 'heavy'（重型）。"""
-    return _FEATURE_RATE_TIER.get(feature, "heavy")
+    """返回功能限流等级：'light'（轻量）/ 'heavy'（重型）。
+
+    默认 light（宽松）；只有明确列出的重型功能才计入 heavy 配额。
+    """
+    return _FEATURE_RATE_TIER.get(feature, "light")
 
 
 def is_enabled(feature: str) -> bool:

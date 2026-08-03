@@ -527,7 +527,7 @@ Output ONLY valid JSON, no markdown."""
     # ------------------------------------------------------------------
 
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(2),
         wait=wait_exponential(multiplier=2, min=2, max=10),
         retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.ConnectError, asyncio.TimeoutError)),
         reraise=True,
@@ -553,7 +553,7 @@ Output ONLY valid JSON, no markdown."""
         if not self._sf_key:
             raise RuntimeError("SiliconFlow API key 未配置 (SILICONFLOW_API_KEY)")
 
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(45, connect=10)) as client:
             resp = await client.post(
                 f"{self._sf_base}/chat/completions",
                 headers={
