@@ -454,3 +454,40 @@
 ### 当前 Git 状态
 - 最新提交: `ec390a2`（2026-08-02 多语言+MV修复+模型池）
 - 待提交: `ai-service/.modalignore`、`app/routes/ai/mv.py`、`app/services/local_storage.py`、`modal_server.py`
+
+---
+
+## 会话记录 (2026-08-03 下午)
+
+### 已完成工作（音乐生成链路 3 个根因修复，全链路验证通过）
+
+#### 1. 修复 siliconflow 网络挂起导致任务卡死（commit `be40f0a`）
+- **根因**: `llm_client.py` 的 `AsyncOpenAI` 未设 timeout（默认 600s），且 `@retry(3)` 指数退避 → siliconflow 连接挂起时单次调用可卡 30 分钟；`_call_siliconflow` 也是 `httpx.AsyncClient(timeout=60)` + retry(3)，最坏 3 分钟
+- **修复**:
+  - `llm_client.py`: AsyncOpenAI 加 `timeout=httpx.Timeout(60, connect=15)`；`chat()`/`chat_stream()` 内层加 `asyncio.wait_for(..., 45)`；retry 3→2
+  - `ai_scheduler.py`: `_call_siliconflow` 超时收紧 `httpx.Timeout(45, connect=10)`；`_call_with_retry` retry 3→2
+  - 线上日志确认: `[primary] siliconflow 调用失败: ConnectTimeout` 在 45s 触发，随后 `[fallback] openrouter 调用成功`
+
+#### 2. 修复 Agnes 优化层无降级（`agnes_music_service.py`）
+- **根因**: `_call_llm_fallback` 用 `llm_client.complete()` 固定 provider=siliconflow，失败不尝试 OpenRouter，且 AsyncOpenAI 挂起
+- **修复**: 改为 `scheduler.dispatch(AITaskType.TEXT, ...)`（原生 httpx + 45s 超时 + siliconflow→openrouter 自动降级），外层 `asyncio.wait_for(180)`
+- **验证**: `agnes_debug: success=True, opt_changed=yes`（真实 OpenRouter 生成优化提示词+歌词）
+
+#### 3. 修复 TEXT/CODE 任务被误判重型限流（`feature_flags.py`）
+- **根因**: `rate_tier()` 对字典外 key 默认返回 `"heavy"` → scheduler 内部 action（text/code/long/vision 等）全部计入 `daily_heavy_feature_calls` 配额 → 满 3 次后生成链路直接 429
+- **修复**: `_FEATURE_RATE_TIER` 补充 `text/code/long/code_alt/vision: "light"`；`rate_tier()` 默认值改为 `"light"`（只有显式列出的重型功能才 heavy）
+- **注意**: 这也解释了为什么歌词生成会隐性消耗重型配额
+
+### 当前部署状态
+- Modal 已部署最新代码（`be40f0a`），`/api/v1/ai/generate` 全链路可用
+- 完整链路日志: siliconflow ConnectTimeout(45s) → OpenRouter 成功(38s) → Mureka 未配 key 降级 → HF 未配 token 跳过 → **Mock 音频兜底**（`ai_provider=agnes+mock`）
+- 音频最终仍走 Mock 因 Mureka/HF key 未配置（见阻塞项）
+
+### 阻塞项（需用户处理）
+1. **SiliconFlow key 无效**（平台侧 403 + 网络挂起）→ 所有走 siliconflow 的请求需等 45s ConnectTimeout 才降级 OpenRouter，拖慢生成。建议用户核实 siliconflow key 或直接配置 `MUREKA_API_KEY`/`HF_TOKEN` 让音乐生成走真实音频
+2. **Mureka/HF key 未配置** → 音乐生成只能出 Mock 示例音频
+3. **RUNWAY/AGNES key 未填** → MV 无动态镜头
+
+### 当前 Git 状态
+- 最新提交: `be40f0a` - "fix(scheduler): llm timeout hardening + Agnes fallback via scheduler + rate_tier default light"（已推送）
+- 工作目录干净
