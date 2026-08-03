@@ -135,3 +135,21 @@ def doctor():
         print(f"  env {k} = {'<set len=' + str(len(v)) + '>' if v else '<EMPTY>'}")
         if v:
             print(f"    prefix={v[:8]}... suffix={v[-6:]}")
+
+    # 清理 0 字节的残留上传文件（生成失败产生的空文件污染卷）
+    import shutil
+    data_dir = pathlib.Path("/root/ai-service/data/uploads")
+    removed = 0
+    if data_dir.exists():
+        for sub in sorted(data_dir.iterdir()):
+            if not sub.is_dir():
+                continue
+            for f in sorted(sub.iterdir()):
+                try:
+                    if f.is_file() and f.stat().st_size == 0:
+                        f.unlink()
+                        removed += 1
+                        print(f"  [cleanup] removed empty: {f.name}")
+                except OSError as e:
+                    print(f"  [cleanup] skip {f.name}: {e}")
+    print(f"  cleanup: removed {removed} empty files")
