@@ -619,3 +619,54 @@
 ### 当前 Git 状态
 - 最新提交: `d46250a` - "perf(mv): video concurrency 1->2 + reuse httpx client + fix get_event_loop deprecation"（已推送）
 - 工作目录干净（AGENTS.md 待提交）
+
+---
+
+## 会话记录 (2026-08-04 深夜)
+
+### 已完成工作 — MV 异步 job 流水线（commit `2c61737`）
+
+#### 1. MV 生成改为异步 job 模式（V3.0）
+- `POST /api/v1/ai/mv/generate` 立即返回 `{"job_id"}`，后台异步执行
+- `GET /api/v1/ai/mv/job/{job_id}` 轮询状态
+- 前端 `create.html` MV 轮询端点 `/api/v1/ai/job/` → `/api/v1/ai/mv/job/`
+- 任务优先跑在 **Modal 独立容器 `run_mv_job`**（`modal.Function.from_name(...).spawn()`，容器存活=任务运行期，不被 web 容器回收打断）；spawn 失败回退本地 `asyncio.create_task`
+
+#### 2. 三层降级调度器 `app/services/mv_scheduler.py`（新增）
+- `MVScheduler.generate_scene_video()` → `(url, channel)`：Agnes 免费视频 → Modal CogVideoX → FFmpeg 幻灯片
+- `generate_music()` → `(url, channel)`：Modal MusicGen-small → SoundHelix 免费背景音乐
+- 信号量 `_agnes_sem=3` / `_modal_sem=8`；`ChannelHealth` 熔断（连续失败 2 次冷却 300s）
+- `modal_gpu_client.py`（新增）：`cogvideo_generate`/`musicgen_generate` 经 `Function.from_name` 调用，异常返回 None
+
+#### 3. Modal GPU 函数（`modal_server.py`）
+- GPU image：torch/diffusers/transformers/accelerate/sentencepiece/soundfile/imageio；`HF_HOME=/models/hf`
+- **CogVideoX-2b**（A10G）：bfloat16 会 OOM → 修复为 `torch.float16` + `enable_sequential_cpu_offload` + `enable_vae_tiling` + `vae.enable_slicing()`（验证通过）
+- **MusicGen-small**（T4）验证通过；`model_volume=avireon-models-v1` 缓存权重，无外部 key
+- `run_mv_job` CPU 函数：**必须先 `init_db()`** 再 `_run_mv_job`（否则 `RuntimeError: Database not initialized`）
+- 3 个函数均挂载共享卷 `{"/root/ai-service/data": avireon-data-v2}`
+
+#### 4. 跨容器状态轮询 — 关键修复（文件优先）
+- **根因**: SQLite WAL 在 Modal Volume（对象存储后端）上跨容器写入不可靠 —— 任务容器已完成并写库，web 容器轮询仍显示 `processing`
+- **修复**: `_write_job_status()` 把状态写成 **JSON 文件** `data/mv_jobs/{job_id}.json`（tmp+replace 原子写）到共享卷；轮询优先读文件 → SQLite 兜底 → 内存 store 兜底
+- **验证**: 独立容器写入 marker → web 容器能读到（证明 SQLite 本身可跨容器读，是 WAL 写不可靠）；文件方案端到端通过
+- 测试作业进程：`e6f10689`（旧架构 web 容器回收丢 store）→ `b58f450a`（Function.lookup 不存在，需用 `Function.from_name`）→ `72bed456` → 本地 `test123/456` 定位 DB 未初始化 → 修复后 `test789` 全链路 183s → 线上 `5c7790ee` 193s 完成
+
+### 当前线上状态（已验证）
+- `POST /api/v1/ai/mv/generate` → 200 `{"job_id"}`；轮询 → `completed` + `video_url`
+- 产出视频 `/uploads/videos/20260803_c7fbc42974c1.mp4` 1.3MB，`ffprobe` 确认 **h264 video + aac audio** 双流（FFmpeg mux 成功）
+- `modal run` 全链路 183s；web spawn 193s（Slideshow 兜底 + SoundHelix 音频，因 Agnes 限速/MV 无 Runway）
+
+### 关键经验教训
+- **Modal 1.5.3 API**：`Function.lookup` 不存在 → 用 `Function.from_name(app_name, fn_name)`；`allow_concurrent_inputs` 已弃用 → `@modal.concurrent(max_inputs=N)` 且必须放 `@app.function` 下方
+- **SQLite over Modal Volume 不可靠**（对象存储后端，WAL 跨容器写会丢）→ 跨容器状态用**共享卷 JSON 文件**
+- 独立 Modal 容器跑业务代码必须**显式 `init_db()`**（不走 FastAPI startup）
+- 本地 dev `data/uploads/` 是测试产物，已 gitignore
+
+### 阻塞项（不变，需用户 key）
+1. **SiliconFlow key**（平台 403）→ 需用户核实，MV 生图才有真实画面（现 Slideshow 兜底）
+2. **Runway key**（`.env` 占位符）→ 有 key 才出动态 MV 镜头
+3. **Mureka/HF key** → 有 key 音乐才走真实生成（现 SoundHelix 兜底）
+
+### 当前 Git 状态
+- 最新提交: `2c61737` - "feat(mv): async job pipeline with Modal spawn + volume status files"（已推送）
+- 工作目录干净（AGENTS.md 待提交）
