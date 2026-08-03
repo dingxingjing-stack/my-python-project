@@ -45,7 +45,7 @@ async def generate_mv_full(request: Request):
     lyrics = req.get("lyrics", "")
     title = req.get("title", "Untitled")
     mv_style = req.get("style", "Cinematic")
-    num_scenes = req.get("num_scenes", 2)
+    num_scenes = req.get("num_scenes", 1)
     creation_id = req.get("creation_id")
 
     if not lyrics:
@@ -209,11 +209,36 @@ async def _generate_mv_from_lyrics(
     scene_images = await asyncio.gather(*[_gen_one_image(is_) for is_ in enumerate(scenes)])
     scene_images = list(scene_images)
 
-    # Step 3: Runway 图片转动态（并发执行，或用占位视频）
+    # Step 3: 动态视频（Agnes 免费视频优先 → Runway 兜底 → 图片 slideshow）
+    from app.services.agnes_video_client import get_agnes_video_client
+    agnes = get_agnes_video_client()
+
+    async def _gen_one_agnes_video(scene):
+        """用 Agnes 免费视频 API 从分镜 prompt 直接生成动态视频。"""
+        prompt = scene.get("image_prompt", "") or scene.get("description", "")
+        if not prompt:
+            return None
+        async with _video_sem:
+            try:
+                task = await agnes.text_to_video(prompt=f"{mv_style}: {prompt}", duration=5)
+                video_id = task.get("video_id") or task.get("id", "")
+                if not video_id:
+                    return None
+                result = await agnes.wait_for_task(video_id, timeout=300)
+                video_url = agnes.extract_video_url(result)
+                if video_url:
+                    resp = await _http.get(video_url)
+                    if resp.status_code == 200 and resp.content:
+                        return storage.save_video(resp.content, ext="mp4")
+            except Exception:
+                pass
+            return None
+
+    # Step 3b: Runway 兜底（图片转动态）
     from app.services.runway_client import get_runway_client
     runway = get_runway_client()
 
-    async def _gen_one_video(img_url):
+    async def _gen_one_runway_video(img_url):
         if not img_url:
             return None
         async with _video_sem:
@@ -236,13 +261,30 @@ async def _generate_mv_from_lyrics(
                             video_url = ""
                         if video_url:
                             resp = await _http.get(video_url)
-                            return storage.save_video(resp.content, ext="mp4")
+                            if resp.status_code == 200 and resp.content:
+                                return storage.save_video(resp.content, ext="mp4")
             except Exception:
                 pass
             return None
 
-    video_segments_raw = await asyncio.gather(*[_gen_one_video(u) for u in scene_images])
-    video_segments = [seg for seg in video_segments_raw if seg]
+    # Agnes 优先：为每个分镜直接生成动态视频（无需图片）
+    # 注意：Agnes 免费层限速 1 任务/60s，这里串行执行（并发只会排队等待，无收益）
+    # 且限速下每场景约 1-2 分钟，最多处理 2 个场景，避免超时挂起
+    if agnes.is_configured:
+        video_segments = []
+        for sc in scenes[:2]:
+            seg = await _gen_one_agnes_video(sc)
+            if seg:
+                video_segments.append(seg)
+        if video_segments:
+            print(f"[MV] Agnes 生成 {len(video_segments)}/{min(len(scenes), 2)} 个动态镜头")
+    else:
+        video_segments = []
+
+    # 如果 Agnes 没产出（无 key/失败），回退 Runway + 图片 slideshow
+    if not video_segments:
+        video_segments_raw = await asyncio.gather(*[_gen_one_runway_video(u) for u in scene_images])
+        video_segments = [seg for seg in video_segments_raw if seg]
 
     # Step 4: FFmpeg 合成最终 MV
     final_video_url = await _compose_mv(
