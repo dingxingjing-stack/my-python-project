@@ -59,6 +59,7 @@
             <a href="/" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Products')">Products</a>
             <a href="/solutions" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Solutions')">Solutions</a>
             <a href="/pricing" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Pricing')">Pricing</a>
+            <a href="/templates" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Templates')">Templates</a>
             <a href="/docs" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition" x-text="t('Developer Docs')">Developer Docs</a>
           </div>
         </div>
@@ -66,14 +67,23 @@
           <div x-data="{ open: false }" class="relative">
             <button @click="open = !open" class="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition border border-gray-200">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
-              <span x-text="lang === 'zh_CN' ? '中文' : 'EN'">EN</span>
+              <span x-text="lang === 'zh_CN' ? '中文' : lang === 'ja_JP' ? '日本語' : lang === 'ko_KR' ? '한국어' : lang === 'es_ES' ? 'Español' : 'EN'">EN</span>
             </button>
-            <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden z-50">
+            <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden z-50">
               <button @click="setLang('en'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
                 <span :class="{ 'font-semibold text-blue-600': lang === 'en' }">English</span>
               </button>
               <button @click="setLang('zh_CN'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
                 <span :class="{ 'font-semibold text-blue-600': lang === 'zh_CN' }">简体中文</span>
+              </button>
+              <button @click="setLang('ja_JP'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
+                <span :class="{ 'font-semibold text-blue-600': lang === 'ja_JP' }">日本語</span>
+              </button>
+              <button @click="setLang('ko_KR'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
+                <span :class="{ 'font-semibold text-blue-600': lang === 'ko_KR' }">한국어</span>
+              </button>
+              <button @click="setLang('es_ES'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
+                <span :class="{ 'font-semibold text-blue-600': lang === 'es_ES' }">Español</span>
               </button>
             </div>
           </div>
@@ -100,6 +110,7 @@
         <a href="/" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Products')">Products</a>
         <a href="/solutions" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Solutions')">Solutions</a>
         <a href="/pricing" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Pricing')">Pricing</a>
+        <a href="/templates" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Templates')">Templates</a>
         <a href="/docs" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-blue-50 rounded-lg" x-text="t('Developer Docs')">Developer Docs</a>
         <hr class="border-gray-200 my-2">
         <template x-if="isLoggedIn">

@@ -99,14 +99,23 @@ setLang: function(l) {
       <div class="flex items-center gap-3">
         <div x-data="{ open: false }" class="relative">
           <button @click="open = !open" class="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition border border-gray-700">
-            <span x-text="lang === 'zh_CN' ? '中文' : 'EN'">EN</span>
+            <span x-text="lang === 'zh_CN' ? '中文' : lang === 'ja_JP' ? '日本語' : lang === 'ko_KR' ? '한국어' : lang === 'es_ES' ? 'Español' : 'EN'">EN</span>
           </button>
-          <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-32 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 overflow-hidden z-50">
+          <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-40 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 overflow-hidden z-50">
             <button @click="setLang('en'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition">
               <span :class="{ 'font-semibold text-blue-400': lang === 'en' }">English</span>
             </button>
             <button @click="setLang('zh_CN'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition">
               <span :class="{ 'font-semibold text-blue-400': lang === 'zh_CN' }">简体中文</span>
+            </button>
+            <button @click="setLang('ja_JP'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition">
+              <span :class="{ 'font-semibold text-blue-400': lang === 'ja_JP' }">日本語</span>
+            </button>
+            <button @click="setLang('ko_KR'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition">
+              <span :class="{ 'font-semibold text-blue-400': lang === 'ko_KR' }">한국어</span>
+            </button>
+            <button @click="setLang('es_ES'); open = false" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition">
+              <span :class="{ 'font-semibold text-blue-400': lang === 'es_ES' }">Español</span>
             </button>
           </div>
         </div>
