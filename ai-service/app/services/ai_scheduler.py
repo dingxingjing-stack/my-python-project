@@ -75,17 +75,36 @@ class AIScheduler:
         self._or_base = s.openrouter_base_url
 
         # 任务 → 路由映射，含降级
-        self._task_map: dict[AITaskType, dict] = {
-            AITaskType.TEXT: {
-                "primary": ("siliconflow", s.siliconflow_text_model),
-                "fallback": ("openrouter", s.openrouter_text_fallback),
+        # primary_provider 决定 TEXT/CODE 的主服务商（siliconflow 或 openrouter）。
+        # 若 siliconflow 为 primary 且配置了 OR key，保留 OR 作 fallback；
+        # 若 openrouter 为 primary（线上 siliconflow 无效时），不再回退到 siliconflow。
+        _use_or_first = (s.primary_provider or "siliconflow").lower() == "openrouter"
+        if _use_or_first:
+            text_route = {
+                "primary": ("openrouter", s.openrouter_text_fallback),
+                "fallback": None,
                 "credit_action": "text",
-            },
-            AITaskType.CODE: {
-                "primary": ("siliconflow", s.siliconflow_code_model),
-                "fallback": ("openrouter", s.openrouter_code_model),
+            }
+            code_route = {
+                "primary": ("openrouter", s.openrouter_code_model),
+                "fallback": None,
                 "credit_action": "code",
-            },
+            }
+        else:
+            text_route = {
+                "primary": ("siliconflow", s.siliconflow_text_model),
+                "fallback": ("openrouter", s.openrouter_text_fallback) if s.openrouter_api_key else None,
+                "credit_action": "text",
+            }
+            code_route = {
+                "primary": ("siliconflow", s.siliconflow_code_model),
+                "fallback": ("openrouter", s.openrouter_code_model) if s.openrouter_api_key else None,
+                "credit_action": "code",
+            }
+
+        self._task_map: dict[AITaskType, dict] = {
+            AITaskType.TEXT: text_route,
+            AITaskType.CODE: code_route,
             AITaskType.LONG: {
                 "primary": ("openrouter", s.openrouter_long_model),
                 "fallback": None,

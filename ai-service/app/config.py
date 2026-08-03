@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     siliconflow_text_model: str = "Qwen/Qwen2.5-7B-Instruct"
     siliconflow_code_model: str = "Qwen/Qwen2.5-Coder-7B-Instruct"
 
+    # ── 服务商优先级 ──
+    # PRIMARY_PROVIDER: TEXT/CODE 任务的主服务商。'siliconflow'(默认,本地) 或 'openrouter'。
+    # 线上若 siliconflow key 无效/挂起，设 openrouter 直接走 OpenRouter 避免 45s 超时降级。
+    primary_provider: str = "siliconflow"
+
     # ── Runway MV 生成 ──
     runway_api_key: str = ""
     runway_api_base: str = "https://api.dev.runwayml.com/v1"

@@ -36,6 +36,7 @@ data_volume = modal.Volume.from_name("avireon-data-v2", create_if_missing=True)
         modal.Secret.from_name("openrouter-key"),
         modal.Secret.from_name("siliconflow-key"),
         modal.Secret.from_name("avireon-secrets"),
+        modal.Secret.from_name("avireon-config"),
     ],
     volumes={"/root/ai-service/data": data_volume},
 )
@@ -81,6 +82,7 @@ def web():
         modal.Secret.from_name("openrouter-key"),
         modal.Secret.from_name("siliconflow-key"),
         modal.Secret.from_name("avireon-secrets"),
+        modal.Secret.from_name("avireon-config"),
     ],
 )
 def doctor():
