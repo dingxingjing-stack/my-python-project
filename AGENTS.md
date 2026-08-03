@@ -491,3 +491,35 @@
 ### 当前 Git 状态
 - 最新提交: `be40f0a` - "fix(scheduler): llm timeout hardening + Agnes fallback via scheduler + rate_tier default light"（已推送）
 - 工作目录干净
+
+---
+
+## 会话记录 (2026-08-03 深夜)
+
+### 已完成工作
+
+#### 1. 首页/控制台 5 语言切换器补全（commit `b13179b`）
+- **问题**: 首页 `static/home.html`、控制台仅支持 en/zh_CN，缺 ja_JP/ko_KR/es_ES；导航缺 Templates 入口
+- **修复**:
+  - `static/home.html`: 语言切换器扩至 5 语言 + 按钮显示当前语言名称 + 桌面/移动导航加 Templates 链接
+  - `app/templates/pages/console.html`: **线上实际生效的 console**（Jinja2 版，内联 translations），语言切换器扩至 5 语言
+  - `static/navbar.html`: 可复用组件扩至 5 语言 + Templates 链接（供 fetch 注入的页面复用）
+  - `static/console.html`: 同步修改（该文件实际是死代码，见下）
+- **关键发现**: `/console` 路由被 pages.py:119（Jinja2 版 `app/templates/pages/console.html`）覆盖，main.py:277 的 `static/console.html` 路由是**死代码**（FastAPI 先注册先匹配，pages_router 先 include）。线上 console 一直渲染的是 Jinja2 版
+
+#### 2. 清理 0 字节污染文件（`modal_server.py` doctor 增强）
+- doctor 函数新增 cleanup: 扫描 volume uploads 目录，删除 0 字节残留文件（生成失败产生的空文件）
+- 已清理 `uploads/videos/20260803_17219cf8b787.mp4`（0 字节）
+
+### 当前线上状态
+- 5 语言切换器覆盖: `/`（home）、`/create`、`/templates`、`/console` 全部上线（已验证 200 + 按钮存在）
+- login/register 是纯静态页（无 i18n 上下文），未加语言切换器（收益低）
+
+### 阻塞项（不变，需用户处理）
+1. **SiliconFlow key 无效**（平台 403 + 网络挂起）→ 每请求等 45s 才降级 OpenRouter，拖慢生成
+2. **Mureka/HF key 未配置** → 音乐只能出 Mock 音频
+3. **RUNWAY/AGNES key 空** → MV 无动态镜头
+
+### 当前 Git 状态
+- 最新提交: `b13179b` - "feat(i18n): 5-language switcher on homepage + console; Templates nav on all pages"（已推送）
+- 工作目录干净
