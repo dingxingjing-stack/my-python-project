@@ -155,3 +155,39 @@ def doctor():
                 except OSError as e:
                     print(f"  [cleanup] skip {f.name}: {e}")
     print(f"  cleanup: removed {removed} empty files")
+
+    # ── SiliconFlow 各端点实测（确认 key 可用性与可用模型） ──
+    sf_key = os.getenv("SILICONFLOW_API_KEY", "")
+    if sf_key:
+        import httpx as _hx
+        base = "https://api.siliconflow.cn/v1"
+        hdr = {"Authorization": f"Bearer {sf_key}", "Content-Type": "application/json"}
+
+        def _probe(name, method, url, body=None):
+            try:
+                if method == "POST":
+                    r = _hx.Client(timeout=30).post(url, headers=hdr, json=body)
+                else:
+                    r = _hx.Client(timeout=30).get(url, headers=hdr)
+                txt = r.text[:200].replace("\n", " ")
+                print(f"  [SF][{name}] {method} {r.status_code}: {txt}")
+                return r
+            except Exception as e:
+                print(f"  [SF][{name}] {method} EXC {type(e).__name__}: {e}")
+                return None
+
+        _probe("chat", "POST", f"{base}/chat/completions",
+               {"model": "Qwen/Qwen2.5-7B-Instruct",
+                "messages": [{"role": "user", "content": "hi"}], "max_tokens": 8})
+        _probe("models", "GET", f"{base}/models")
+        for m in ["Qwen/Qwen3-8B", "Qwen/Qwen2.5-7B-Instruct",
+                  "THUDM/GLM-4-9B-0414", "BAAI/bge-large-zh-v1.5"]:
+            _probe(f"chat-{m.split('/')[-1]}", "POST", f"{base}/chat/completions",
+                   {"model": m, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 8})
+        _probe("image", "POST", f"{base}/images/generations",
+               {"model": "black-forest-labs/FLUX.1-schnell",
+                "prompt": "a red apple", "image_size": "512x512"})
+        _probe("video", "POST", f"{base}/video/generations",
+               {"model": "Qwen/Qwen2.5-VL-7B-Instruct", "prompt": "a cat walking"})
+    else:
+        print("  [SF] SILICONFLOW_API_KEY EMPTY, skip probe")
