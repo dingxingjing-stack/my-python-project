@@ -670,3 +670,34 @@
 ### 当前 Git 状态
 - 最新提交: `2c61737` - "feat(mv): async job pipeline with Modal spawn + volume status files"（已推送）
 - 工作目录干净（AGENTS.md 待提交）
+
+---
+
+## 会话记录 (2026-08-05)
+
+### 已完成工作 — `/create` 页模板快捷选择器（commit `1dc5b3a`）
+
+#### 1. Step 1 (Describe) 顶部新增内置模板选择器
+- **数据来源**: `GET /api/v1/templates/list?limit=20&offset=0`，`filter(is_active).slice(0, 8)`（线上 6 套全 active）
+- **UI**: 横向滚动卡片（`overflow-x-auto`），每卡含 `cover_img`(data URI SVG)、`template_name`、`style_tags`；选中态 `ring-2 ring-purple-500`；无封面时 🎵 占位；卡片上方 "Quick Templates" + "Browse all →" 链接到 `/templates`
+- **预填逻辑 `applyTemplate(t)`**:
+  - `music_prompt` → `form.prompt`（可继续编辑）
+  - `style_tags` 首词经映射表 → `form.style` 下拉值（古风/国风/民乐→folk，流行/甜歌→pop，说唱/rap→hiphop，赛博朋克/电子→electronic，治愈→folk，短剧→pop）
+  - `lyric_template` → `form.lyrics`（仅当为空）
+  - `template_name` → `form.title`
+  - 弹窗提示"模板已应用"
+- **验证**: 线上 `/create` 页面含 Quick Templates / loadTemplates / applyTemplate；模板 API 6 套齐全、字段含 `is_active`；Jinja 模板本地渲染 OK；style 映射 6 个首词全部正确
+- 注: 已修复 `x-show="!t.cover_img || !templateId"` 中 `templateId` 干扰所有卡片封面 fallback 的逻辑 bug（改为仅 `!t.cover_img`）
+
+### 当前线上状态
+- Modal 已部署（含模板选择器），`/create` 页加载正常
+- 6 套内置模板（古风国风/流行甜歌/说唱嘻哈/赛博朋克电子/治愈轻音乐/短剧BGM）可直接点击预填生成
+
+### 阻塞项（不变，需用户 key）
+1. **SiliconFlow key**（平台 403）→ 需用户核实，MV 生图才有真实画面（现 Slideshow 兜底）
+2. **Runway key**（`.env` 占位符）→ 有 key 才出动态 MV 镜头
+3. **Mureka/HF key** → 有 key 音乐才走真实生成（现 SoundHelix 兜底）
+
+### 当前 Git 状态
+- 最新提交: `1dc5b3a` - "feat(create): quick template selector on Step 1"（已推送）
+- 工作目录干净（AGENTS.md 待提交）
