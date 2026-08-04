@@ -51,6 +51,30 @@
       <!-- Step 1: Describe -->
       <div x-show="step === 0" x-transition>
         <h2 class="text-xl font-bold mb-4">{{ _('What do you want to create?') }}</h2>
+
+        <!-- 内置模板快捷选择 -->
+        <div x-show="templates.length > 0" class="mb-5">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-purple-300">📋 {{ _('Quick Templates') }}</span>
+            <a href="/templates" class="text-xs text-gray-500 hover:text-purple-400 transition">{{ _('Browse all') }} →</a>
+          </div>
+          <div class="flex gap-3 overflow-x-auto pb-2" style="scrollbar-width: thin;">
+            <template x-for="t in templates" :key="t.id">
+              <button @click="applyTemplate(t)" :class="templateId === t.id ? 'ring-2 ring-purple-500 border-purple-500' : 'border-gray-800 hover:border-purple-500'"
+                      class="flex-shrink-0 w-32 bg-gray-900 border rounded-xl overflow-hidden text-left transition">
+                <div class="h-20 bg-gray-800 flex items-center justify-center overflow-hidden">
+                  <img :src="t.cover_img" class="w-full h-full object-cover" loading="lazy" @error="$el.style.display='none'">
+                  <span x-show="!t.cover_img" class="text-3xl">🎵</span>
+                </div>
+                <div class="px-2 py-1.5">
+                  <div class="text-xs font-semibold truncate" x-text="t.template_name"></div>
+                  <div class="text-[10px] text-gray-500 truncate mt-0.5" x-text="t.style_tags"></div>
+                </div>
+              </button>
+            </template>
+          </div>
+        </div>
+
         <textarea x-model="form.prompt" rows="4" placeholder="{{ _('Describe the song you want... e.g. \'A sad song about leaving home, cinematic feel\'') }}"
                   class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none resize-none"></textarea>
 
@@ -376,6 +400,8 @@
       // Template prefill
       templateName: '',
       musicPrompt: '',
+      templates: [],
+      templateId: null,
 
       // Credits info
       usageInfo: null,
@@ -407,6 +433,39 @@
           }
         } catch (e) {}
         this.loadUsage();
+        this.loadTemplates();
+      },
+
+      async loadTemplates() {
+        try {
+          const res = await fetch('/api/v1/templates/list?limit=20&offset=0');
+          const data = await res.json();
+          this.templates = (data.items || []).filter(t => t.is_active).slice(0, 8);
+        } catch (e) { console.error('Failed to load templates:', e); }
+      },
+
+      // 点击模板：预填 prompt/风格/歌词模板/标题
+      applyTemplate(t) {
+        this.templateId = t.id;
+        this.templateName = t.template_name || '';
+        this.musicPrompt = t.music_prompt || '';
+        if (t.music_prompt) this.form.prompt = t.music_prompt;
+        if (t.style_tags) {
+          const tag = t.style_tags.split(',')[0].trim().toLowerCase();
+          const map = {
+            '古风': 'folk', '国风': 'folk', '民乐': 'folk',
+            '流行': 'pop', '甜歌': 'pop',
+            '说唱': 'hiphop', 'rap': 'hiphop',
+            '赛博朋克': 'electronic', '电子': 'electronic',
+            '治愈': 'folk',
+            '短剧': 'pop',
+          };
+          this.form.style = map[tag] || this.form.style;
+        }
+        if (t.lyric_template && !this.form.lyrics) this.form.lyrics = t.lyric_template;
+        if (t.template_name) this.form.title = t.template_name;
+        // 提示用户可继续编辑
+        this.showModalMsg('模板已应用', `已载入「${t.template_name}」模板，可继续调整提示词后生成歌词。`);
       },
 
       async loadUsage() {
