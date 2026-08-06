@@ -701,3 +701,54 @@
 ### 当前 Git 状态
 - 最新提交: `1dc5b3a` - "feat(create): quick template selector on Step 1"（已推送）
 - 工作目录干净（AGENTS.md 待提交）
+
+---
+
+## 会话记录 (2026-08-06)
+
+### 已完成工作 — MV V4.0 本地开源模型重构（commit `2b10e3d`，已推送 + 已部署）
+
+#### 1. 重构方向：付费/受限外部 API → 本地免费开源模型
+- **图片通道**：三层降级改为两层
+  - Layer 1 `Modal FLUX.1-schnell`（FP8 量化，T4，4 步，Apache-2.0 免费）+ FP8 quantize + CPU offload，16GB 显存可跑
+  - Layer 2 `SiliconFlow SDXL` 兜底（GPU 配额耗尽 / Flux 失败时）
+- **音频通道**：Layer 1 `Modal Kokoro-82M` 本地 TTS（中文自动 `zf_xiaobei` 音色，英文 `af_heart`）→ Layer 2 SoundHelix 背景音乐
+- 旧三层降级（Agnes → CogVideoX → 幻灯片）与 MusicGen 已废弃，只剩 `modal_gpu_client.py` 中未调用的包装函数（无害）
+
+#### 2. 新增代码
+- `modal_server.py`（+433/-161 全 diff）：新增 `flux_image_generate`（quanto FP8 + `enable_model_cpu_offload` + vae slicing/tiling）、`kokoro_tts`（KPipeline lang_code 自动 z/a）；gpu_image 增加 `espeak-ng`/`numpy`/`optimum-quanto`/`kokoro`/`misaki[zh]` 依赖
+- `modal_gpu_client.py`：`GPUQuotaError` + `_is_quota_exception`（quota/exhausted/429/concurrent）+ `flux_image_generate`/`kokoro_tts` 客户端
+- `mv_scheduler.py`：`ChannelHealth` 熔断复用；`gpu_quota_exhausted` 标记；`_clean_lyrics_for_tts` 去除 `[mm:ss]`/`[Verse 1]`/`Title:` 等标签（避免 TTS 朗读标签）；每通道独立信号量对齐 Modal `max_inputs`
+- `mv.py`：`_gen_one_image` 经 `mv_sched.generate_scene_image`（Flux→SDXL）；图片 5s 片段淡入淡出转场 concat（替代旧视频 concat）；分镜数不足用歌词行补齐；GPU 配额耗尽且无图时抛友好错误；`_compose_text_mv` 兜底保留
+
+#### 3. 修复（本次新增）
+- `_clean_lyrics_for_tts` 原先只剥离 `[mm:ss]` 时间戳，读`[Verse 1]` `[Chorus]` 等会读出声 → 改为 `line.startswith("[")` 剥离任意方括号标签（本地验证通过）
+
+#### 4. 清理
+- 删除 `ai-service/` 根下 2 个本地测试残留 MV job 状态文件（`3e54f0bd.json`/`5e325138.json`）
+- `.gitignore` 新增 `ai-service/*.json` 防止复发
+
+#### 5. 部署与验证（Modal）
+- `modal deploy modal_server.py` 成功（73s），4 个 GPU 函数 + web + run_mv_job + doctor 全部注册
+- `/health` → 200 `{"status":"ok","build":"2026-07-31-v4"}`；`/api/v1/features` → 200 stage=1
+- **模型权重已全部缓存**在 `avireon-models-v1`: `Niansuh/FLUX.1-schnell`、`hexgrad/Kokoro-82M`（及旧 `CogVideoX-2b`/`musicgen-small`）→ 首次调用无需联网下载
+- **`kokoro_tts` 线上实测通过**：T4 容器正常加载缓存模型（0.75s）+ 中文 jieba 前缀字典构建成功，返回 wav 字节
+
+### doctor 诊断（2026-08-06 线上）
+- SiliconFlow `[SF]` 状态从 403 变为 **402 余额不足**（`account balance insufficient`）→ key 有效但需充值才走真实 SDXL 生图
+- Agnes key 已填且 `[AGNES][create]` 返回 200（`agnes-key` 服务已可用，但 MV V4.0 已不再使用 Agnes 通道）
+- HF `api-inference.huggingface.co` DNS 解析失败（gaierror）→ 不影响本地缓存模型；推测 HF 推理接口在 Modal 无网/被墙
+
+### 当前线上状态
+- Modal 已部署最新 `flux_image_generate` / `kokoro_tts`，`/create` MV 走本地 Flux 画面 + Kokoro 语音
+- Socket: `https://dingxingjing-stack--avireony-ai-music-web.modal.run`
+
+### 阻塞项（需用户处理）
+1. **SiliconFlow 余额不足**（402）→ 如需真实 SDXL 兜底画面需充值/换 key；当前 MV 走本地 Flux（免费）
+2. **Runway key**（`.env` 占位符）→ 动态镜头在 V4.0 已改为图片序列转场（Runway 动态镜头按钮已在前端置灰），如需动态 MV 需用户提供真实 Runway key
+3. **HF 服务器 DNS 不通** → 如需从 HF 在线拉新模型需排查 Modal 网络
+
+### 当前 Git 状态
+- 最新提交: `2b10e3d` - "feat(mv): V4.0 local open-source models (Flux images + Kokoro TTS) over paid APIs"（已推送）
+- Modal 已部署（含本地开源模型版 MV 链路）
+- 工作目录：仅剩 AGENTS.md 未提交
