@@ -157,6 +157,13 @@ ENV/
 env.bak/
 venv.bak/
 
+# Local secrets (never commit API keys)
+secrets.local.json
+secrets.json
+
+# MV job status artifacts written to project root during local runs
+ai-service/*.json
+
 # Spyder project settings
 .spyderproject
 .spyproject

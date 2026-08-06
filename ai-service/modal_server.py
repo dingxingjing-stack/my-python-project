@@ -31,7 +31,7 @@ model_volume = modal.Volume.from_name("avireon-models-v1", create_if_missing=Tru
 
 gpu_image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg")
+    .apt_install("ffmpeg", "espeak-ng")
     .pip_install(
         "torch>=2.3",
         "diffusers>=0.30",
@@ -42,6 +42,10 @@ gpu_image = (
         "imageio",
         "imageio-ffmpeg",
         "huggingface_hub",
+        "numpy",
+        "optimum-quanto",
+        "kokoro>=0.9.4",
+        "misaki[zh]",
     )
     .env({
         "HF_HOME": "/models/hf",
@@ -121,6 +125,137 @@ def musicgen_generate(prompt: str, max_new_tokens: int = 512) -> bytes:
     data = pathlib.Path(tmp).read_bytes()
     pathlib.Path(tmp).unlink(missing_ok=True)
     return data
+
+
+@app.function(
+    image=gpu_image,
+    gpu="T4",
+    memory=32768,
+    timeout=60 * 15,
+    max_containers=2,
+    scaledown_window=300,
+    volumes={"/models": model_volume},
+)
+@modal.concurrent(max_inputs=2)
+def flux_image_generate(prompt: str, width: int = 1024, height: int = 576, seed: int = 0) -> bytes:
+    """FLUX.1-schnell (FP8 量化) 本地文生图，返回 jpg 字节。
+
+    Apache-2.0 商用免费；4 步推理；FP8 量化 Transformer 后显存 ~12GB，T4 16GB 可跑。
+    模型权重缓存到 /models/hf，无外部 API key。
+    """
+    import os
+    import pathlib
+    import tempfile
+    os.makedirs("/models/hf", exist_ok=True)
+    import torch
+    from diffusers import (
+        AutoencoderKL,
+        FlowMatchEulerDiscreteScheduler,
+        FluxPipeline,
+        FluxTransformer2DModel,
+    )
+    from optimum.quanto import freeze, qfloat8, quantize
+    from huggingface_hub import hf_hub_download
+    from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
+
+    # Niansuh 镜像缺 scheduler/scheduler_config.json，仅含 config.json，
+    # 且自动装配时会丢 transformer，改为显式逐组件加载（确定性装配）。
+    repo = "Niansuh/FLUX.1-schnell"
+    scheduler_cfg = hf_hub_download(repo, "scheduler/config.json")
+    scheduler = FlowMatchEulerDiscreteScheduler.from_config(scheduler_cfg)
+    transformer = FluxTransformer2DModel.from_pretrained(
+        repo, subfolder="transformer", torch_dtype=torch.bfloat16, low_cpu_mem_usage=True
+    )
+    text_encoder = CLIPTextModel.from_pretrained(
+        repo, subfolder="text_encoder", torch_dtype=torch.bfloat16, low_cpu_mem_usage=True
+    )
+    text_encoder_2 = T5EncoderModel.from_pretrained(
+        repo, subfolder="text_encoder_2", torch_dtype=torch.bfloat16, low_cpu_mem_usage=True
+    )
+    vae = AutoencoderKL.from_pretrained(
+        repo, subfolder="vae", torch_dtype=torch.bfloat16, low_cpu_mem_usage=True
+    )
+    tokenizer = CLIPTokenizer.from_pretrained(repo, subfolder="tokenizer")
+    tokenizer_2 = T5TokenizerFast.from_pretrained(repo, subfolder="tokenizer_2")
+
+    # FP8 量化 Transformer（权重 ~24GB → ~12GB），配合 CPU offload 在 16GB 显存上运行
+    # 注意: quanto 的 quantize() 原地修改并返回 None，不能重新赋值
+    quantize(transformer, weights=qfloat8)
+    freeze(transformer)
+
+    pipe = FluxPipeline(
+        scheduler=scheduler,
+        text_encoder=text_encoder,
+        text_encoder_2=text_encoder_2,
+        tokenizer=tokenizer,
+        tokenizer_2=tokenizer_2,
+        transformer=transformer,
+        vae=vae,
+    )
+    pipe.enable_model_cpu_offload(gpu_id=0)
+    if hasattr(pipe.vae, "enable_slicing"):
+        pipe.vae.enable_slicing()
+    if hasattr(pipe.vae, "enable_tiling"):
+        pipe.vae.enable_tiling()
+
+    generator = torch.Generator().manual_seed(int(seed))
+    out = pipe(
+        prompt=prompt,
+        width=int(width),
+        height=int(height),
+        guidance_scale=0.0,
+        num_inference_steps=4,
+        max_sequence_length=256,
+        generator=generator,
+        output_type="pil",
+    )
+    img = out.images[0]
+    fd, tmp = tempfile.mkstemp(suffix=".jpg")
+    os.close(fd)
+    img.save(tmp, "JPEG", quality=90)
+    data = pathlib.Path(tmp).read_bytes()
+    pathlib.Path(tmp).unlink(missing_ok=True)
+    return data
+
+
+@app.function(
+    image=gpu_image,
+    gpu="T4",
+    timeout=60 * 10,
+    max_containers=2,
+    scaledown_window=300,
+    volumes={"/models": model_volume},
+)
+@modal.concurrent(max_inputs=2)
+def kokoro_tts(text: str, voice: str = "", speed: float = 1.0) -> bytes:
+    """Kokoro-82M 本地 TTS，返回 24kHz wav 字节。
+
+    Apache-2.0；自动按文本语言选择 voice（含中文用 z 语言 + zf_xiaobei，否则英文 af_heart）。
+    模型权重缓存到 /models/hf，无外部 API key。
+    """
+    import io
+    import os
+    os.makedirs("/models/hf", exist_ok=True)
+    import numpy as np
+    import soundfile as sf
+    from kokoro import KPipeline
+
+    has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in text)
+    lang_code = "z" if has_cjk else "a"
+    if not voice:
+        voice = "zf_xiaobei" if has_cjk else "af_heart"
+
+    pipeline = KPipeline(lang_code=lang_code)
+    chunks = []
+    for _gs, _ps, audio in pipeline(text[:600], voice=voice, speed=float(speed)):
+        if audio is not None and len(audio):
+            chunks.append(audio)
+    if not chunks:
+        return b""
+    audio = np.concatenate(chunks) if len(chunks) > 1 else chunks[0]
+    buf = io.BytesIO()
+    sf.write(buf, audio, 24000, format="WAV")
+    return buf.getvalue()
 
 
 @app.function(

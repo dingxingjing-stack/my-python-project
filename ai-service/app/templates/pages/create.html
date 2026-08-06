@@ -276,6 +276,13 @@
                       class="border rounded-lg px-3 py-2 text-sm transition" x-text="s"></button>
             </template>
           </div>
+          <!-- Runway AI 动态镜头：暂未开放，置灰提示 -->
+          <button disabled title="AI动态镜头暂未开放，当前版本为图片序列拼接MV"
+                  class="w-full bg-gray-900 border border-dashed border-gray-700 text-gray-600 cursor-not-allowed py-2.5 rounded-xl text-sm font-medium mb-3 flex items-center justify-center gap-2">
+            <span>🎬 Runway AI 动态镜头</span>
+            <span class="text-xs">暂未开放</span>
+          </button>
+          <p class="text-xs text-gray-500 mb-3">AI动态镜头暂未开放，当前版本为图片序列拼接MV（本地 Flux 生成画面，淡入淡出转场）</p>
           <button @click="generateMV()" :disabled="loading || mvGenerating"
                   class="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium transition flex items-center justify-center gap-2">
             <span x-show="mvGenerating" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
@@ -286,6 +293,7 @@
               <div class="bg-pink-600 h-2 rounded-full transition-all" :style="`width: ${mvProgress}%`"></div>
             </div>
           </div>
+          <div x-show="mvError" class="mt-2 text-xs text-red-400" x-text="mvError"></div>
           <div x-show="form.video_url" class="mt-3 rounded-xl overflow-hidden aspect-video bg-gray-900">
             <video :src="form.video_url" controls class="w-full h-full object-cover"></video>
           </div>
@@ -396,6 +404,7 @@
       coverGenerating: false,
       mvGenerating: false,
       mvProgress: 0,
+      mvError: '',
 
       // Template prefill
       templateName: '',
@@ -636,6 +645,7 @@
         if (this.loading || this.mvGenerating) return;
         this.mvGenerating = true;
         this.mvProgress = 0;
+        this.mvError = '';
         const idemKey = crypto.randomUUID();
         try {
           const res = await fetch('/api/v1/ai/mv/generate', {
@@ -669,6 +679,7 @@
               } else if (status.status === 'failed') {
                 clearInterval(poll);
                 this.mvGenerating = false;
+                this.mvError = status.error || 'MV 生成失败，请稍后重试';
               }
             } catch (e) {
               clearInterval(poll);

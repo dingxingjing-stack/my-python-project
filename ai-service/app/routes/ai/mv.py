@@ -1,11 +1,12 @@
-"""AI MV 视频全流程 — V3.0 三层降级异步方案。
+"""AI MV 视频全流程 — V4.0 本地开源模型优先 + FFmpeg 淡入淡出转场。
 
 链路：
 1. Nemotron 生成故事剧本 + 分镜 JSON
-2. 硅基 SDXL 为每帧分镜生成静态图片（兜底视觉素材）
-3. 三层降级动态视频：Agnes 免费视频 → Modal CogVideoX → FFmpeg 幻灯片
-   背景音乐：Modal MusicGen → SoundHelix 免费背景音乐
-4. FFmpeg 拼接动态片段 + 音频 + 字幕 → 成品 MV
+2. 每帧分镜生成静态图片序列（图片序列拼接 MV，非动态镜头）
+   Layer 1  Modal FLUX.1-schnell 本地（FP8 量化，T4，Apache-2.0 免费）
+   Layer 2  SiliconFlow SDXL（GPU 配额耗尽 / Flux 失败时兜底）
+3. 音频（朗读歌词）：Layer 1  Kokoro-82M 本地 TTS → Layer 2  SoundHelix 背景音乐
+4. FFmpeg 图片序列淡入淡出转场拼接 + 字幕 + 音频 mux → 成品 MV
 
 任务采用异步 job 模式：POST /ai/mv/generate 立即返回 job_id，
 前端轮询 GET /ai/mv/job/{job_id} 获取进度与结果。
@@ -28,11 +29,6 @@ from app.services.local_storage import get_local_storage
 from app.services.feature_flags import require_feature
 
 router = APIRouter(prefix="/ai", tags=["ai-mv"])
-
-# 并发信号量 — 防止第三方 AI 接口被大量并发请求打爆
-_MAX_IMAGE_CONCURRENCY = 2
-_image_sem = asyncio.Semaphore(_MAX_IMAGE_CONCURRENCY)
-
 
 # 内存任务存储（与 music.py 的 job 轮询模式一致）
 _mv_job_store: dict[str, dict] = {}
@@ -63,9 +59,13 @@ def _read_job_status_file(job_id: str) -> dict | None:
     try:
         p = _mv_status_dir() / f"{job_id}.json"
         if not p.exists():
+            print(f"[MV-POLL] job={job_id} 状态文件不存在: {p}", flush=True)
             return None
-        return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        print(f"[MV-POLL] job={job_id} 读取状态文件: {data.get('status')}", flush=True)
+        return data
+    except Exception as exc:
+        print(f"[MV-POLL] job={job_id} 状态文件读取异常: {type(exc).__name__}: {exc}", flush=True)
         return None
 
 
@@ -333,7 +333,7 @@ async def _generate_mv_from_lyrics(
     scheduler=None,
     job_id: str = "",
 ) -> str:
-    """完整 MV 链路：分镜 → SDXL 生图 → 三层降级动态视频 + 音乐 → FFmpeg 合成。"""
+    """完整 MV 链路：分镜 → 图片序列（Flux→SiliconFlow）→ Kokoro/SoundHelix 音频 → FFmpeg 淡入淡出合成。"""
     if scheduler is None:
         from app.services.ai_scheduler import get_scheduler
         scheduler = get_scheduler()
@@ -346,51 +346,57 @@ async def _generate_mv_from_lyrics(
         num_scenes=num_scenes, user_id=user_id,
     )
     scenes = _parse_storyboard(storyboard_result.text)
+    if not isinstance(scenes, list) or not scenes:
+        scenes = [{"scene": 1, "description": "Opening scene", "image_prompt": storyboard_result.text[:200]}]
 
-    # Step 2: 硅基 SDXL 为每帧分镜生图（兜底视觉素材，失败不影响主链路）
-    async def _gen_one_image(i_scene):
-        i, scene = i_scene
-        async with _image_sem:
-            prompt = scene.get("image_prompt", "") or scene.get("description", f"Scene {i+1}")
-            try:
-                image_result = await scheduler.generate_image_sdxl(
-                    prompt=prompt,
-                    width=1024, height=576,
-                    num_images=1,
-                    user_id=user_id,
-                )
-                if image_result.data.get("image_urls"):
-                    return image_result.data["image_urls"][0]
-            except Exception:
-                pass
-            return ""
+    # 分镜数不足时用歌词行补齐到 num_scenes，保证图片序列长度与请求一致
+    lyric_lines = [l for l in (lyrics or "").splitlines() if l.strip()]
+    while len(scenes) < max(int(num_scenes), 1):
+        i = len(scenes)
+        line = lyric_lines[i % len(lyric_lines)] if lyric_lines else f"Scene {i + 1}"
+        scenes.append({
+            "scene": i + 1,
+            "description": f"Scene {i + 1}",
+            "image_prompt": f"{mv_style}, cinematic music video scene, {line}",
+        })
 
-    scene_images = await asyncio.gather(*[_gen_one_image(is_) for is_ in enumerate(scenes)])
-    scene_images = list(scene_images)
-
-    # Step 3: 三层降级动态视频 + 背景音乐（走 MV 调度器）
+    # Step 2: 图片序列生成（Flux 本地 → SiliconFlow SDXL 兜底）
     from app.services.mv_scheduler import get_mv_scheduler
     mv_sched = get_mv_scheduler()
 
-    # 3a. 每场景生成动态视频片段（Agnes → Modal CogVideoX → None 走幻灯片兜底）
-    scene_video_results = await asyncio.gather(*[
-        mv_sched.generate_scene_video(sc, mv_style, storage, idx)
-        for idx, sc in enumerate(scenes)
-    ])
-    video_segments = [r[0] for r in scene_video_results if r[0]]
-    video_channels = [r[1] for r in scene_video_results if r[1] != "none"]
-    if video_segments:
-        print(f"[MV] 动态镜头 {len(video_segments)} 个，通道={video_channels}")
+    async def _gen_one_image(i_scene):
+        i, scene = i_scene
+        if not isinstance(scene, dict):
+            scene = {"description": str(scene), "image_prompt": ""}
+        prompt = (scene.get("image_prompt") or scene.get("description") or "").strip()
+        if not prompt:
+            line = lyric_lines[i] if i < len(lyric_lines) else f"Scene {i + 1}"
+            prompt = f"{mv_style}, cinematic music video scene, {line}"
+        try:
+            url, _channel = await mv_sched.generate_scene_image(
+                {"image_prompt": prompt, "description": prompt}, mv_style, storage, i
+            )
+            return url or ""
+        except Exception:
+            return ""
 
-    # 3b. 背景音乐（MusicGen → SoundHelix）
-    audio_url, audio_channel = await mv_sched.generate_music(title, mv_style, storage)
+    scene_images = await asyncio.gather(*[_gen_one_image(is_) for is_ in enumerate(scenes)])
+    scene_images = [u for u in scene_images if u]
+    if scene_images:
+        print(f"[MV] 图片序列 {len(scene_images)} 张")
+
+    # Step 3: 音频（Kokoro 本地 TTS → SoundHelix 兜底）
+    audio_url, audio_channel = await mv_sched.generate_music(lyrics, title, mv_style, storage)
     if audio_url:
-        print(f"[MV] 背景音乐通道={audio_channel}")
+        print(f"[MV] 音频通道={audio_channel}")
 
-    # Step 4: FFmpeg 合成最终 MV（含音频 mux）
+    # 若 GPU 配额耗尽且图片全部失败：返回友好错误而非脏渲染
+    if mv_sched.gpu_quota_exhausted and not scene_images:
+        raise RuntimeError("算力额度耗尽，请稍后重试。当前免费 GPU 额度已用完，可稍后再试。")
+
+    # Step 4: FFmpeg 合成最终 MV（图片序列淡入淡出 + 字幕 + 音频 mux）
     final_video_url = await _compose_mv(
         scene_images=scene_images,
-        video_segments=video_segments,
         lyrics=lyrics,
         style=mv_style,
         storage=storage,
@@ -417,13 +423,12 @@ async def _generate_mv_from_lyrics(
 
 async def _compose_mv(
     scene_images: list[str],
-    video_segments: list[str],
     lyrics: str,
     style: str,
     storage,
     audio_url: Optional[str] = None,
 ) -> str:
-    """FFmpeg 合成：图片/视频 + 字幕 + 背景音乐 → 最终 MV。"""
+    """FFmpeg 合成：图片序列淡入淡出转场 + 字幕 + 背景音乐 → 最终 MV。"""
     ffmpeg_available = True
     try:
         subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
@@ -444,8 +449,8 @@ async def _compose_mv(
 
     # 过滤空/无效图片 URL，仅保留有效路径
     scene_images = [u for u in (scene_images or []) if u and u.startswith("/uploads/")]
-    if not scene_images and not video_segments:
-        # 无 SDXL 图片且无视频片段：用 FFmpeg 生成歌词文字幻灯片视频，保证 MV 可播放
+    if not scene_images:
+        # 无图片：用 FFmpeg 生成歌词文字幻灯片视频，保证 MV 可播放
         return await _compose_text_mv(lyrics, style, storage, audio_url=audio_url)
 
     # 生成 SRT 字幕
@@ -463,7 +468,6 @@ async def _compose_mv(
     def _to_fs_path(url: str) -> str:
         """将 /uploads/... URL 转换为容器内绝对路径，供 FFmpeg 读取。"""
         if url.startswith("/uploads/"):
-            # storage 保存目录 = ai-service/data/uploads
             from app.services.local_storage import get_local_storage
             ls_base = get_local_storage()._base
             rel = url[len("/uploads/"):]
@@ -471,34 +475,52 @@ async def _compose_mv(
         return url
 
     try:
-        # 如果有 Runway 视频片段，用 concat；否则用图片 slideshow
-        if video_segments:
-            concat_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
-            for seg in video_segments:
-                concat_file.write(f"file '{_to_fs_path(seg)}'\n")
-            concat_file.close()
+        # 每张图片生成 5s 片段（统一 1280x720 + 淡入淡出转场）
+        segments = []
+        for idx, img in enumerate(scene_images):
+            seg = f"{output_path}.{idx}.ts"
+            src = _to_fs_path(img)
+            vf = (
+                "scale=1280:720:force_original_aspect_ratio=decrease:flags=lanczos,"
+                "pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,"
+                "fade=t=in:st=0:d=0.6,fade=t=out:st=4.4:d=0.6"
+            )
+            cmd = [
+                "ffmpeg", "-y",
+                "-loop", "1", "-t", "5", "-i", src,
+                "-vf", vf,
+                "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+                seg,
+            ]
+            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            _, err = await proc.communicate()
+            if proc.returncode != 0:
+                print(f"[MV][slide] 场景 {idx} FFmpeg 失败 rc={proc.returncode}: {err.decode(errors='replace')[:300]}")
+                continue
+            segments.append(seg)
 
-            cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_file.name]
-            if subtitle_file:
-                cmd += ["-vf", f"subtitles={subtitle_file}"]
-            cmd += ["-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p", output_path]
-            proc = await asyncio.create_subprocess_exec(*cmd)
-            await proc.communicate()
-            Path(concat_file.name).unlink(missing_ok=True)
-        else:
-            # 用图片生成 slideshow
-            image_list = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
-            for img in scene_images:
-                image_list.write(f"file '{_to_fs_path(img)}'\nduration 5\n")
-            image_list.close()
+        if not segments:
+            print("[MV][slide] 所有图片片段生成失败，回退文字幻灯片 MV")
+            return await _compose_text_mv(lyrics, style, storage, audio_url=audio_url)
 
-            cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", image_list.name]
-            if subtitle_file:
-                cmd += ["-vf", f"subtitles={subtitle_file}"]
-            cmd += ["-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p", output_path]
-            proc = await asyncio.create_subprocess_exec(*cmd)
-            await proc.communicate()
-            Path(image_list.name).unlink(missing_ok=True)
+        # concat demuxer 拼接所有片段
+        concat_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
+        for seg in segments:
+            concat_file.write(f"file '{seg}'\n")
+        concat_file.close()
+
+        cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_file.name]
+        if subtitle_file:
+            cmd += ["-vf", f"subtitles={subtitle_file}"]
+        cmd += ["-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p", output_path]
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        _, err = await proc.communicate()
+        if proc.returncode != 0:
+            print(f"[MV][slide] concat 失败 rc={proc.returncode}: {err.decode(errors='replace')[:300]}")
+            return await _compose_text_mv(lyrics, style, storage, audio_url=audio_url)
+        Path(concat_file.name).unlink(missing_ok=True)
+        for seg in segments:
+            Path(seg).unlink(missing_ok=True)
 
         # 若存在背景音乐，将音频 mux 进视频（-shortest 截到视频长度）
         if audio_fs_path and Path(output_path).exists() and Path(output_path).stat().st_size > 0:
