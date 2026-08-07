@@ -504,7 +504,7 @@ Output ONLY valid JSON, no markdown."""
 
         async with httpx.AsyncClient(timeout=120) as client:
             resp = await client.post(
-                f"{self._sf_base}/v1/image/generations",
+                f"{self._sf_base.rstrip('/')}/image/generations",
                 headers={
                     "Authorization": f"Bearer {self._sf_key}",
                     "Content-Type": "application/json",

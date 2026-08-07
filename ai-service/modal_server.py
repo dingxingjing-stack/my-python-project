@@ -130,7 +130,7 @@ def musicgen_generate(prompt: str, max_new_tokens: int = 512) -> bytes:
 @app.function(
     image=gpu_image,
     gpu="T4",
-    memory=32768,
+    memory=49152,
     timeout=60 * 15,
     max_containers=2,
     scaledown_window=300,
@@ -158,25 +158,27 @@ def flux_image_generate(prompt: str, width: int = 1024, height: int = 576, seed:
     from huggingface_hub import hf_hub_download
     from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
 
-    # Niansuh 镜像缺 scheduler/scheduler_config.json，仅含 config.json，
-    # 且自动装配时会丢 transformer，改为显式逐组件加载（确定性装配）。
+    # Niansun 镜像缺 scheduler_config.json，仅含 config.json，逐组件显式加载（确定性装配）。
+    # 注意: 不能用 low_cpu_mem_usage=True —— 会让参数留在 meta/lazy 张量，
+    # 之后 enable_model_cpu_offload 内部对 meta 张量调 .to() 抛
+    # "Cannot copy out of meta tensor"（流水线并发必现）。改为显式加载到 CPU（容器内存已提高到 48GB）。
     repo = "Niansuh/FLUX.1-schnell"
-    scheduler_cfg = hf_hub_download(repo, "scheduler/config.json")
+    scheduler_cfg = hf_hub_download(repo, "scheduler/config.json", local_files_only=True)
     scheduler = FlowMatchEulerDiscreteScheduler.from_config(scheduler_cfg)
     transformer = FluxTransformer2DModel.from_pretrained(
-        repo, subfolder="transformer", torch_dtype=torch.bfloat16, low_cpu_mem_usage=True
+        repo, subfolder="transformer", torch_dtype=torch.bfloat16, local_files_only=True
     )
     text_encoder = CLIPTextModel.from_pretrained(
-        repo, subfolder="text_encoder", torch_dtype=torch.bfloat16, low_cpu_mem_usage=True
+        repo, subfolder="text_encoder", torch_dtype=torch.bfloat16, local_files_only=True
     )
     text_encoder_2 = T5EncoderModel.from_pretrained(
-        repo, subfolder="text_encoder_2", torch_dtype=torch.bfloat16, low_cpu_mem_usage=True
+        repo, subfolder="text_encoder_2", torch_dtype=torch.bfloat16, local_files_only=True
     )
     vae = AutoencoderKL.from_pretrained(
-        repo, subfolder="vae", torch_dtype=torch.bfloat16, low_cpu_mem_usage=True
+        repo, subfolder="vae", torch_dtype=torch.bfloat16, local_files_only=True
     )
-    tokenizer = CLIPTokenizer.from_pretrained(repo, subfolder="tokenizer")
-    tokenizer_2 = T5TokenizerFast.from_pretrained(repo, subfolder="tokenizer_2")
+    tokenizer = CLIPTokenizer.from_pretrained(repo, subfolder="tokenizer", local_files_only=True)
+    tokenizer_2 = T5TokenizerFast.from_pretrained(repo, subfolder="tokenizer_2", local_files_only=True)
 
     # FP8 量化 Transformer（权重 ~24GB → ~12GB），配合 CPU offload 在 16GB 显存上运行
     # 注意: quanto 的 quantize() 原地修改并返回 None，不能重新赋值
