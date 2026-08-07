@@ -214,6 +214,7 @@ def flux_image_generate(prompt: str, width: int = 1024, height: int = 576, seed:
     Apache-2.0 商用免费；4 步推理；FP8 量化 Transformer 后显存 ~12GB，T4 16GB 可跑。
     模型权重缓存到 /models/hf，无外部 API key。流水线按容器懒加载并缓存复用。
     """
+    import os
     import pathlib
     import tempfile
     import torch
