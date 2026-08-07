@@ -127,26 +127,20 @@ def musicgen_generate(prompt: str, max_new_tokens: int = 512) -> bytes:
     return data
 
 
-@app.function(
-    image=gpu_image,
-    gpu="T4",
-    memory=49152,
-    timeout=60 * 15,
-    max_containers=1,
-    scaledown_window=300,
-    volumes={"/models": model_volume},
-)
-@modal.concurrent(max_inputs=1)
-def flux_image_generate(prompt: str, width: int = 1024, height: int = 576, seed: int = 0) -> bytes:
-    """FLUX.1-schnell (FP8 量化) 本地文生图，返回 jpg 字节。
+_FLUX_PIPE = None
 
-    Apache-2.0 商用免费；4 步推理；FP8 量化 Transformer 后显存 ~12GB，T4 16GB 可跑。
-    模型权重缓存到 /models/hf，无外部 API key。
+
+def _get_flux_pipe():
+    """懒加载并缓存 FLUX 流水线（模块级单例）。
+
+    容器存活窗口（scaledown_window=300s）内多次调用复用同一实例，
+    避免每次调用重复加载 219 权重分片（~120s/次）。
     """
+    global _FLUX_PIPE
+    if _FLUX_PIPE is not None:
+        return _FLUX_PIPE
+
     import os
-    import pathlib
-    import tempfile
-    os.makedirs("/models/hf", exist_ok=True)
     import torch
     from diffusers import (
         AutoencoderKL,
@@ -158,6 +152,7 @@ def flux_image_generate(prompt: str, width: int = 1024, height: int = 576, seed:
     from huggingface_hub import hf_hub_download
     from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
 
+    os.makedirs("/models/hf", exist_ok=True)
     # Niansun 镜像缺 scheduler_config.json，仅含 config.json，逐组件显式加载（确定性装配）。
     # 注意: 不能用 low_cpu_mem_usage=True —— 会让参数留在 meta/lazy 张量，
     # 之后 enable_model_cpu_offload 内部对 meta 张量调 .to() 抛
@@ -199,7 +194,31 @@ def flux_image_generate(prompt: str, width: int = 1024, height: int = 576, seed:
         pipe.vae.enable_slicing()
     if hasattr(pipe.vae, "enable_tiling"):
         pipe.vae.enable_tiling()
+    _FLUX_PIPE = pipe
+    return pipe
 
+
+@app.function(
+    image=gpu_image,
+    gpu="T4",
+    memory=49152,
+    timeout=60 * 15,
+    max_containers=1,
+    scaledown_window=300,
+    volumes={"/models": model_volume},
+)
+@modal.concurrent(max_inputs=1)
+def flux_image_generate(prompt: str, width: int = 1024, height: int = 576, seed: int = 0) -> bytes:
+    """FLUX.1-schnell (FP8 量化) 本地文生图，返回 jpg 字节。
+
+    Apache-2.0 商用免费；4 步推理；FP8 量化 Transformer 后显存 ~12GB，T4 16GB 可跑。
+    模型权重缓存到 /models/hf，无外部 API key。流水线按容器懒加载并缓存复用。
+    """
+    import pathlib
+    import tempfile
+    import torch
+
+    pipe = _get_flux_pipe()
     generator = torch.Generator().manual_seed(int(seed))
     out = pipe(
         prompt=prompt,
