@@ -803,3 +803,22 @@
 2. SiliconFlow key 仍禁用（403）→ 如需真实 SDXL 兜底需用户充值/换 key；当前 MV 走本地 Flux（免费）已可用
 3. Runway key 未填 → 动态镜头按钮仍前置灰；V4.0 已用图片序列转场替代
 4. `/create` 页 MV 生成时长较长（~10 分钟含冷加载），可持续优化
+
+---
+
+## 会话记录 (2026-08-07 续) — FLUX 冷加载加速优化
+
+### 已完成工作 — 流水线模块级缓存（commit `ad02d8a` + `ba72db2`，已推送+已部署）
+- **根因**: `flux_image_generate` 每次调用都重装全套模型（219 权重分片 ~120s），即使容器 warm 也重复付出冷加载代价 → 3 场景基线间隔 117~174s
+- **优化 `ad02d8a`**: 模块级单例 `_FLUX_PIPE` + `_get_flux_pipe()` 懒加载，模型装配仅首调执行，后续 warm 容器调用直接复用已加载 pipeline
+- **回归修复 `ba72db2`**: 重构误删 `import os` → 首跑 `NameError: name 'os' is not defined`，补回后恢复
+
+### 性能对比复测报告
+- 归档: `ai-service/reports/2026-08-07_flux_coldload_perf_report.md`
+- 基线 job `55c6f1df` 593s vs 优化后 job `b2f48e93` **440s（-26%）**
+- 场景间隔从基线 ~146s → 优化后 **~79s（-46%）**，证实缓存复用生效
+- 产物验证: 3 张真实 Flux 封面（1024x576, 114/141/106KB）+ 视频 292KB h264+aac，帧亮度 YMIN=28/YAVG=75/YMAX=221 确认真实图像
+
+### 当前 Git 状态
+- 最新提交: `ba72db2` - "fix(flux): re-add import os in flux_image_generate (broken by cache refactor)"（已推送）
+- 工作目录未提交: `AGENTS.md`、`ai-service/reports/2026-08-07_flux_coldload_perf_report.md`
