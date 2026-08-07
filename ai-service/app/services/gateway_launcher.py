@@ -55,35 +55,34 @@ def _find_opencode() -> str:
 
 
 def _start_opencode_backend(logf) -> subprocess.Popen | None:
-    """启动 opencode serve，用 prlimit + nice 限制资源。"""
+    """启动 opencode serve，限制子进程资源。
+
+    容器 Docker 默认禁止调高 nice 优先级（--nice 负值 -> "Operation not permitted"），
+    因此这里只做"降低优先级 + 限制堆内存"，不做 RLIMIT_NICE。
+    """
     bin_path = _find_opencode()
     port = GATEWAY_BACKEND_PORT
-    cmd = [
-        "prlimit",
-        "--nofile=256:32768", "--nproc=128:128", "--cpu=120",
-        "--nice=-5",  # 比主业务进程稍低优先级
-        bin_path, "serve", "--hostname", "127.0.0.1", "--port", str(port),
-    ]
-    if shutil.which("prlimit") is None:
-        # 无 prlimit 时退回 nice + 直接起
-        cmd = ["nice", "-n", "15", bin_path, "serve", "--hostname", "127.0.0.1", "--port", str(port)]
-
     env = dict(os.environ)
+    # 限制 opencode/Node 堆内存（避免与业务进程争抢容器内存）；容器级 memory=4096 兜底
     env.setdefault("NODE_OPTIONS", "--max-old-space-size=512")
+    env.setdefault("OPENCODE_CACHE_DIR", "/tmp/opencode-cache")
+
+    # nice 降低优先级 + ulimit 限制文件句柄。不开 -v(虚拟内存) 上限 —— Node 会保留大块 VAS，
+    # 硬性 cap 反而可能 OOM；容器内存限制由 Modal memory=4096 统一约束。
+    shell_cmd = (
+        f"ulimit -n 4096 && nice -n 15 "
+        f"'{bin_path}' serve --hostname 127.0.0.1 --port {port}"
+    )
     try:
         return subprocess.Popen(
-            cmd,
+            shell_cmd,
+            shell=True,
             stdout=logf, stderr=subprocess.STDOUT,
-            env=env, start_new_session=True,
+            env=env, start_new_session=True, cwd=_repo_root(),
         )
     except Exception as exc:
-        print(f"[launcher] opencode serve launch failed: {type(exc).__name__}: {exc}", flush=True)
-        ret = _fallback_opencode(bin_path, port, logf, env)
-        return ret
-
-
-def _fallback_opencode(bin_path: str, port: int, logf, env: dict) -> subprocess.Popen | None:
-    """prlimit/nice 均不可用的兜底：直接进程启动（仍限制 NODE_HEAP）。"""
+        print(f"[launcher] opencode backend launch failed: {type(exc).__name__}: {exc}", flush=True)
+    # 兜底：不带限制直接启动
     try:
         return subprocess.Popen(
             [bin_path, "serve", "--hostname", "127.0.0.1", "--port", str(port)],

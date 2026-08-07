@@ -102,10 +102,17 @@ def build_app() -> FastAPI:
 
             # 2) 发消息
             system, user_parts = _split_messages(req.messages)
+            model_id = (req.model or GATEWAY_MODEL).strip()
             body: dict = {
-                "model": req.model or GATEWAY_MODEL,
                 "parts": user_parts,
             }
+            # 仅当显式指定了非默认/sentinel 模型时才携带 model；容器内 opencode 默认模型
+            # (opencode/big-pickle) 已足够，且不可用模型（如无鉴权的 opencode/free）会触发 500。
+            if model_id and model_id not in ("opencode/free", GATEWAY_MODEL):
+                # opencode 原生要求 model 为 {providerID, modelID} 对象
+                if "/" in model_id:
+                    provider_id, model_id_only = model_id.split("/", 1)
+                    body["model"] = {"providerID": provider_id, "modelID": model_id_only}
             if system:
                 body["system"] = system
             try:
@@ -113,8 +120,15 @@ def build_app() -> FastAPI:
                     f"{BACKEND_URL}/session/{session_id}/message",
                     json=body,
                 )
-                mresp.raise_for_status()
+                if mresp.status_code >= 400:
+                    raise HTTPException(
+                        502,
+                        f"opencode message failed HTTP {mresp.status_code}: "
+                        f"{mresp.text[:1200]} (request body: {body})",
+                    )
                 data = mresp.json()
+            except HTTPException:
+                raise
             except Exception as exc:
                 raise HTTPException(502, f"opencode message failed: {type(exc).__name__}: {exc}") from exc
 
