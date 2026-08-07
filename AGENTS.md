@@ -822,3 +822,37 @@
 ### 当前 Git 状态
 - 最新提交: `ba72db2` - "fix(flux): re-add import os in flux_image_generate (broken by cache refactor)"（已推送）
 - 工作目录未提交: `AGENTS.md`、`ai-service/reports/2026-08-07_flux_coldload_perf_report.md`
+
+---
+
+## 会话记录 (2026-08-07 续) — 本地 Mode-A 网关 + 歌词 prompt 修复 + gzip/缓存/health（commit `50fcd53`）
+
+### 背景
+本地全站运行检查发现：lyrics 生成 35s 且返回英文任务解释而非中文歌词；`/api/v1/health` 404；大页面无 gzip/缓存。
+需求：无第三方 LLM key 时自动走 OpenCode 本地 Mode-A 免费网关；有 key 优先第三方。
+
+### 已完成工作
+1. **本地 Mode-A 网关降级路由** (`config.py` + `ai_scheduler.py`)
+   - `LOCAL_GATEWAY_BASE_URL`（默认 `http://127.0.0.1:4096/v1`）+ `LOCAL_GATEWAY_MODEL`（默认 `opencode/free`）
+   - 当 `SILICONFLOW_API_KEY` 与 `OPENROUTER_API_KEY` 均空 → TEXT/CODE 路由到 `local_gateway`
+   - 新增 `_call_local_gateway`（OpenAI 兼容 `/chat/completions`，无 key，60s/connect 5s 超时）
+   - 路由验证：无 key 时 `TEXT route primary=('local_gateway','opencode/free')` ✅
+2. **歌词强制中文 system prompt** (`ai_scheduler.py` generate_lyrics)
+   - 固定 STRICT OUTPUT RULES：只输出歌词、禁止任务解释/元评论/回声请求、首行 Title、结尾 LRC
+   - `lyrics.py _parse_lyrics` 剥离 preamble（Title/Verse/Chorus 之前的所有散文）与 LRC 后尾注
+3. **接口超时控制** (`lyrics.py`)
+   - `asyncio.wait_for(..., timeout=LYRICS_TIMEOUT_SECS)`（env 可调，默认 30s）；超时走 Mock 兜底
+4. **gzip + 缓存 + health** (`main.py`)
+   - 全局 `GZipMiddleware(minimum_size=500)`；`/static/*` Cache-Control `max-age=86400, immutable`；`/create`/`/templates`/`/` `/console` `max-age=300`
+   - 新增 `/api/v1/health`（GET+HEAD）统一标准路径
+
+### 验证结果（本地 8000）
+- `/api/v1/health` → 200（原 404 修复）
+- `/create` 72KB → gzip Content-Encoding + Cache-Control 300s 生效；`/static/js/app.js` → `max-age=86400, immutable`
+- `/api/v1/ai/lyrics`（OpenRouter，本地有 key 走第三方）→ **22s**，纯中文结构化歌词（Title/Verse/Chorus/Verse2/Bridge/LRC），无英文任务解释
+- 无 key 路由测试：`local_gateway` 正确选中；网关未启动时异常 → Mock 兜底（设计行为）
+
+### 当前 Git 状态
+- 最新提交: `50fcd53`（已推送）
+- 工作目录未提交: `AGENTS.md`（本次会话更新）
+- 本地 server 已用新代码重启，运行于 `http://127.0.0.1:8000`
