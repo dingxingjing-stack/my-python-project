@@ -325,6 +325,8 @@ def kokoro_tts(text: str, voice: str = "", speed: float = 1.0) -> bytes:
     secrets=[
         modal.Secret.from_name("openrouter-key"),
         modal.Secret.from_name("siliconflow-key"),
+        modal.Secret.from_name("mureka-key"),
+        modal.Secret.from_name("runway-key"),
         modal.Secret.from_name("avireon-secrets"),
         modal.Secret.from_name("avireon-config"),
         modal.Secret.from_name("agnes-key"),
@@ -398,6 +400,8 @@ def web():
     secrets=[
         modal.Secret.from_name("openrouter-key"),
         modal.Secret.from_name("siliconflow-key"),
+        modal.Secret.from_name("mureka-key"),
+        modal.Secret.from_name("runway-key"),
         modal.Secret.from_name("avireon-secrets"),
         modal.Secret.from_name("avireon-config"),
         modal.Secret.from_name("agnes-key"),
@@ -453,6 +457,8 @@ def run_mv_job(
     secrets=[
         modal.Secret.from_name("openrouter-key"),
         modal.Secret.from_name("siliconflow-key"),
+        modal.Secret.from_name("mureka-key"),
+        modal.Secret.from_name("runway-key"),
         modal.Secret.from_name("avireon-secrets"),
         modal.Secret.from_name("avireon-config"),
         modal.Secret.from_name("agnes-key"),
