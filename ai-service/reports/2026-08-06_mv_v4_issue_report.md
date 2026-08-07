@@ -113,8 +113,12 @@
 
 ## 复测补充（修复交付后填写）
 > 以下由「GPU 全量 MV 复测」环节补充填写：
-- 提交：`YYYY-MM-DD`，job_id = ?
-- 产物 video_url、时长、codec ?
-- 是否包含 Flux 真实画面？（covers 次数 / 时长）
-- 分阶段耗时？
-- 结论：Flux 链路是否修复可用？
+- 提交：`2026-08-07`，job_id = `55c6f1df`
+- 产物 video_url = `/uploads/videos/20260807_dec8773e536b.mp4`，时长 4.68s，h264 1280x720 + aac 音频双流
+- 是否包含 Flux 真实画面？**是** — 3 个场景全部生成真实 Flux 封面（1024x576 JPEG: `covers/20260807_df2add8cad73.jpg` 64KB、`fa96d113f3e9.jpg` 45KB、`e0e7909a07e2.jpg` 40KB），视频由图片序列（淡入淡出转场）+ Kokoro 音频合成，帧亮度 YMIN=22/YAVG=136/YMAX=207 证实为真实图像内容而非文字幻灯片
+- 分阶段耗时：Flux 场景串行（scene0 ~09:38 / scene1 ~09:40 / scene2 ~09:42，各约 120s 冷加载+生成）→ TTS + 合成 11:43:29 保存 → 总耗时 ~593s（含 Flux 单容器冷启动）
+- 结论：**Flux 链路修复可用** ✅
+  - 根因复验：单容器 `modal run` 冷加载 219 权重分片全部成功、无 meta tensor 崩溃；先前并发场景（`max_containers=2` / `_MAX_FLUX_CONCURRENCY=2`）两容器同时冷加载导致其一残留 meta 张量 → `enable_model_cpu_offload` 崩溃
+  - 修复：`modal_server.py` `flux_image_generate` `max_containers 2→1`、`max_inputs 2→1`（配合 commit `7f97e6c` 中 `mv_scheduler._MAX_FLUX_CONCURRENCY 2→1`）串行化冷加载
+  - SF 双 `/v1` bug 亦确认修复：线上 URL 已为单 `/v1/image/generations`，当前返回 403（key 禁用），非 404
+- 备注：单场景 Flux 生成约 120s 主要耗在冷加载权重（219 shards）；后续同一容器存活窗口内复用可显著加速

@@ -752,3 +752,54 @@
 - 最新提交: `2b10e3d` - "feat(mv): V4.0 local open-source models (Flux images + Kokoro TTS) over paid APIs"（已推送）
 - Modal 已部署（含本地开源模型版 MV 链路）
 - 工作目录：仅剩 AGENTS.md 未提交
+
+---
+
+## 会话记录 (2026-08-07)
+
+### 已完成工作 — MV V4 Flux 并发崩溃根因定位并修复（commit `7f97e6c`，已推送+已部署）
+
+#### 1. 初版部署 2 个致命问题定位
+- **Flux 生图 meta-tensor 崩溃**: `NotImplementedError: Cannot copy out of meta tensor; no data!`，发生于 `flux_image_generate` 的 `enable_model_cpu_offload`
+- **SiliconFlow 双 `/v1`**: `ai_scheduler.py` `generate_image_sdxl` 把 `_sf_base`（已含 `/v1`）再拼接 `f"{_sf_base}/v1/image/generations"` → `https://api.siliconflow.cn/v1/v1/image/generations` 404
+- 修复已提交 `ed18a05`:
+  - `modal_server.py flux_image_generate`: 去除 `low_cpu_mem_usage=True`（致 meta 张量）→ 全量加载 CPU；加 `local_files_only=True`；容器内存 32GB→48GB
+  - `ai_scheduler.py generate_image_sdxl`: 改 `f"{self._sf_base.rstrip('/')}/image/generations"`
+
+#### 2. 关键复验结论 — 并发冷启动才是 Flux 崩溃根因
+- 修复后 `modal run modal_server.py::flux_image_generate` 单实例**成功**：219 权重分片全部加载、进入 4 步推理、无 meta 异常
+- 但 pipeline 端到端仍崩溃：MV 用 `asyncio.gather` 并发发起 3 个 Flux 调用 → `max_containers=2`/`max_inputs=2` 使**两个容器同时冷加载权重** → 其一中途 abort 残留 meta 张量 → offload 崩溃
+- **最终修复 `7f97e6c`（串行化）**:
+  - `modal_server.py flux_image_generate`: `max_containers 2→1`、`max_inputs 2→1`
+  - `mv_scheduler.py`: `_MAX_FLUX_CONCURRENCY 2→1`
+  - 生图通道改为单容器冷加载；音频/其他通道仍保留并发
+
+#### 3. 修复后端到端复测通过（job `55c6f1df`）
+- `POST /api/v1/ai/mv/generate` → 200 `{job_id: 55c6f1df}`
+- **3 个场景全部生成真实 Flux 封面**: `covers/20260807_df2add8cad73.jpg`(64KB)/`fa96d113f3e9.jpg`(45KB)/`e0e7909a07e2.jpg`(40KB)，均 1024x576
+- 视频 `uploads/videos/20260807_dec8773e536b.mp4`：4.68s，h264 1280x720 + aac 双流，`_compose_image_mv` 图片序列（淡入淡出转场）+ Kokoro 音频合成
+- 帧亮度统计 YMIN=22/YAVG=136/YMAX=207 → 证实视频内为真实图像而非文字幻灯片
+- 总耗时 ~593s（主要耗在 Flux 单容器冷加载 219 shards；后续容器存活窗口内复用可加速）
+- SF 双 `/v1` 确认修复：URL 已为单 `/v1/image/generations`，当前返回 403（key 禁用）非 404
+
+#### 4. 报告归档
+- `ai-service/reports/2026-08-06_mv_v4_issue_report.md` 已补充「复测补充」章节（job、产物、Flux 确认、分阶段耗时）
+
+### SSL/编码注意
+- 复测断言文本存在 GBK 编码问题，写文件避免直接内联中文；日志下行分析和 `Add-Content` 单独处理
+
+### 当前 Git 状态
+- 最新提交: `7f97e6c` - "fix(mv): serialize Flux image gen to avoid concurrent cold-load meta-tensor crash"（已推送）
+- Modal 已部署（包含串行化 Flux 修复）
+- 工作目录未提交：`AGENTS.md`、`ai-service/reports/2026-08-06_mv_v4_issue_report.md`
+
+### 关键经验教训
+- **Modal 容器并发冷启动会导致随机 meta 张量崩溃**: 大模型（FLUX 219 权重分片）在**多个容器同时首次加载**时，个别容器可能中途 abort 残留 meta 参数，随后 `enable_model_cpu_offload`/`.to()` 直接炸。修复方向：`max_containers=1` + 应用层信号量串行化冷加载
+- **同一 bug 两种表象**: `low_cpu_mem_usage=True` 与**并发冷启动**都可能触发 `Cannot copy out of meta tensor`。先做单实例直连验证区分是代码还是并发问题
+- 线上 `goroutine` 指标不复存在；Debug/诊断用 `modal app logs <app>`
+
+### 待办（下一步）
+1. **Flux 冷加载性能优化**: 降低冷加载耗时（~120s/场景，主要耗在 0221 shards 加载）。可选项：a) 容器扩大缓冲提前预热  b) 减小 `scaledown_window` 反向 → 即在 warm 窗口内做多场景生成（正在窗口内 3 张已测通）
+2. SiliconFlow key 仍禁用（403）→ 如需真实 SDXL 兜底需用户充值/换 key；当前 MV 走本地 Flux（免费）已可用
+3. Runway key 未填 → 动态镜头按钮仍前置灰；V4.0 已用图片序列转场替代
+4. `/create` 页 MV 生成时长较长（~10 分钟含冷加载），可持续优化
