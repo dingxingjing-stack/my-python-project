@@ -825,6 +825,39 @@
 
 ---
 
+## 会话记录 (2026-08-07 续) — 强制本地网关业务回归 + 启动密钥降级为可选（commit `01bb3e4`，已推送+已部署）
+
+### 背景
+针对云端容器内 Mode-A 网关，执行强制本地网关业务回归：无第三方 key 时必须走 local_gateway 免费模型。
+
+### 已完成工作
+1. **回归三阶段（经线上 Modal 部署逐步验证）**：
+   - **阶段A 关键 key 存在但 opencode 用错模型**：初版只加 `FORCE_LOCAL_GATEWAY=true`（保留 key）→ lyrics 走 local 但 opencode 因 key 存在默认选 `siliconflow/zai-org/GLM-5V-Turbo` → 该 key 已 401（"Token is invalid"）→ 服务返回原始错误 → 必须真正清空 key
+   - **阶段B 清空 key 后启动被拒**：删掉 key 后 `run_startup_checks` 把 SILICONFLOW/OPENROUTER 当必填 → `ASGI lifespan startup failed` / `RuntimeError: 缺失必填密钥 (2 项)` → 需改 startup_check
+   - **阶段C 全链路 local_gateway 成功**（最终形态）
+2. **`app/startup_check.py` 重构**（本次核心代码修复）：
+   - `REQUIRED` 置空，SILICONFLOW_API_KEY/OPENROUTER_API_KEY 从必填改到 `OPTIONAL`（缺失仅打印警告，view 走 local_gateway，不再阻启动）
+   - 说明更新：无第三方 key 时 TEXT/CODE 自动走容器内 opencode 本地网关兜底
+3. **线上验证清单（全部通过）**：
+   - `POST /api/v1/ai/lyrics`（清空 key + FORCE_LOCAL_GATEWAY=true）→ 200，`provider=local_gateway`，`model=opencode/free`，`elapsed_ms=9790`；日志 `[local_gateway] base=http://127.0.0.1:4096/v1 model=opencode/free`；返回**纯结构化中文歌词**（Title/Verse/Chorus/Bridge/LRC），无英文任务解释/元评论
+   - `GET /api/v1/health` → 200 `{"status":"ok","build":"2026-07-31-v4"}`
+   - 静态页 `/create` → gzip Content-Encoding + Cache-Control `public, max-age=300`；`/static/js/app.js` → `public, max-age=86400, immutable`
+   - **30s 超时兜底**：设 `LYRICS_TIMEOUT_SECS=3`（覆盖默认 30，规避真实慢调用）→ 日志 `[lyrics] AI generation timed out after 3s`，返回 `provider=mock`/`model=mock` + 标题 `[Mock]...` → 超时→Mock 链路正常
+4. **生产恢复验证**：恢复 real key 后移除 FORCE/LYRICS_TIMEOUT → `/api/v1/ai/lyrics` 200 `provider=openrouter` `model=nvidia/nemotron-3-nano-30b-a3b:free` LRC 正常（15.9s）。期间一次慢调用（>30s）正确 Mock 兜底
+
+### 关键经验教训
+- **FORCE_LOCAL_GATEWAY=true 不足以隔离 opencode 模型选择**：opencode 看环境变量里 key 是否存在来选择默认 provider；只要 key 在 env，opencode 就优先第三方（即使该 key 已失效）。真正回到免费 big-pickle 必须先**从容器环境移除 key**（删/置空 secret）
+- **startup_check 把文本 key 当必填会杀掉无 key 部署**：keyless 是本地网关架构的正式形态，必须把其降为 optional
+- Modal secret 无 update，只能 delete+create；删真实 key 前先备份到 TEMP（`.env` 是权威来源）
+
+### 当前 Git 状态
+- 最新提交: `01bb3e4` - "fix(startup): make LLM text keys optional (...)"
+- 已推送至 `origin/main`
+- 工作目录待提交: AGENTS.md（本次更新）
+- Modal secrets 已恢复生产值（openrouter-key 73 位 / siliconflow-key 51 位 / avireon-config 无测试覆盖项）
+
+---
+
 ## 会话记录 (2026-08-07 续) — 云端 Mode-A 网关容器内启动修复（commit `f43640a` 等，已推送+已部署）
 
 ### 背景
