@@ -9,6 +9,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
@@ -147,6 +148,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # 全局 gzip 压缩 — 减少 /create、/templates 等大 HTML/JSON 首屏传输体积
+    app.add_middleware(GZipMiddleware, minimum_size=500)
+
     # 挂载 static 静态资源目录（与 ai-service/ 同级）
     app.mount(
         "/static",
@@ -163,6 +167,19 @@ def create_app() -> FastAPI:
     async def i18n_middleware(request: Request, call_next):
         request.state.locale = detect_locale(request)
         response = await call_next(request)
+        return response
+
+    # 静态资源与整页 HTML 缓存头 — 减少首屏加载传输与重复拉取
+    @app.middleware("http")
+    async def cache_headers_middleware(request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        # 静态资源（js/css/img/fonts）：强缓存，避免每次重新拉取
+        if path.startswith("/static/"):
+            response.headers["Cache-Control"] = "public, max-age=86400, immutable"
+        # 动态但低变化页面：浏览器缓存 + 短 TTL，配合 gzip 减量
+        elif path in ("/create", "/templates", "/", "/console"):
+            response.headers["Cache-Control"] = "public, max-age=300"
         return response
 
     _register_routers(app)
@@ -249,12 +266,23 @@ def _register_routers(app: FastAPI) -> None:
     )
 
     # ── Health check（GET + HEAD 兼容外部探活） ──
+    _HEALTH_JSON = {"status": "ok", "build": "2026-07-31-v4"}
+
     @app.get("/health", include_in_schema=False)
     async def health():
-        return {"status": "ok", "build": "2026-07-31-v4"}
+        return _HEALTH_JSON
 
     @app.head("/health", include_in_schema=False)
     async def health_head():
+        return JSONResponse(content=None, headers={"Content-Length": "15"})
+
+    # 统一标准路径 /api/v1/health，兼容外部探测工具
+    @app.get("/api/v1/health", include_in_schema=False)
+    async def health_api():
+        return _HEALTH_JSON
+
+    @app.head("/api/v1/health", include_in_schema=False)
+    async def health_api_head():
         return JSONResponse(content=None, headers={"Content-Length": "15"})
 
     # ── 功能开关状态查询（前端可用） ──

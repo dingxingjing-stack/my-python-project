@@ -73,13 +73,29 @@ class AIScheduler:
         self._sf_base = s.siliconflow_base_url
         self._or_key = s.openrouter_api_key
         self._or_base = s.openrouter_base_url
+        self._local_base = s.local_gateway_base_url
+        self._local_model = s.local_gateway_model
 
         # 任务 → 路由映射，含降级
         # primary_provider 决定 TEXT/CODE 的主服务商（siliconflow 或 openrouter）。
         # 若 siliconflow 为 primary 且配置了 OR key，保留 OR 作 fallback；
         # 若 openrouter 为 primary（线上 siliconflow 无效时），不再回退到 siliconflow。
+        # 当第三方 LLM API Key 全部未配置时（本地/无 key 环境），
+        # TEXT/CODE 自动转发到 OpenCode 本地 Mode-A 网关（OpenAI 兼容 /chat/completions 免费模型）。
+        self._use_local = not (s.siliconflow_api_key or s.openrouter_api_key)
         _use_or_first = (s.primary_provider or "siliconflow").lower() == "openrouter"
-        if _use_or_first:
+        if self._use_local:
+            text_route = {
+                "primary": ("local_gateway", s.local_gateway_model),
+                "fallback": None,
+                "credit_action": "text",
+            }
+            code_route = {
+                "primary": ("local_gateway", s.local_gateway_model),
+                "fallback": None,
+                "credit_action": "code",
+            }
+        elif _use_or_first:
             text_route = {
                 "primary": ("openrouter", s.openrouter_text_fallback),
                 "fallback": None,
@@ -126,6 +142,7 @@ class AIScheduler:
         self._semaphores: dict[str, asyncio.Semaphore] = {
             "siliconflow": asyncio.Semaphore(5),
             "openrouter": asyncio.Semaphore(5),
+            "local_gateway": asyncio.Semaphore(5),
         }
 
     # ------------------------------------------------------------------
@@ -290,7 +307,12 @@ class AIScheduler:
         lang_name = lang_map.get(language, language or "English")
         system = f"""You are a professional songwriter. Write emotionally engaging, singable lyrics.
 Lyrics language: {lang_name}. All lyrics must be in this language.
-Always return in this format:
+Always return in this format: output ONLY the final lyrics with the exact structure below.
+
+STRICT OUTPUT RULES (must follow all):
+1. Output ONLY the final lyrics. Never explain your task, never add remarks, never describe what you are doing, never add meta commentary, never greet, never apologize.
+2. Do NOT echo the user's request. Do NOT start with sentences like "The user gave a task" or any task-explanation text. Do not write any prose outside the lyrics.
+3. First line is the title.
 
 Title: <song title>
 
@@ -309,12 +331,14 @@ Bridge:
 Chorus:
 <lyrics>
 
-Then also provide LRC format:
+At the very end, provide the LRC block:
 
 LRC:
 [00:00.00] first lyric line
 [00:05.00] second lyric line
-..."""
+[00:10.00] third lyric line
+
+Do not add anything after the LRC block."""
         user_msg = (
             f"Topic: {prompt}\n"
             f"Genre: {style}\n"
@@ -563,6 +587,8 @@ Output ONLY valid JSON, no markdown."""
             return await self._call_siliconflow(model, messages, temperature, max_tokens)
         elif provider == "openrouter":
             return await self._call_openrouter(model, messages, temperature, max_tokens)
+        elif provider == "local_gateway":
+            return await self._call_local_gateway(model, messages, temperature, max_tokens)
         else:
             raise ValueError(f"Unknown provider: {provider}")
 
@@ -615,6 +641,34 @@ Output ONLY valid JSON, no markdown."""
             )
             if resp.status_code != 200:
                 print(f"[openrouter ERROR] status={resp.status_code} model={model} body={resp.text[:500]}")
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"] or ""
+
+    async def _call_local_gateway(
+        self, model: str, messages: list[dict], temperature: float, max_tokens: int,
+    ) -> str:
+        """OpenCode 本地 Mode-A 免费网关（OpenAI 兼容 /chat/completions）。
+
+        当第三方 LLM API Key 全部未配置时自动启用，转发到 LOCAL_GATEWAY_BASE_URL。
+        本地网关无需鉴权 key；若探测失败（未启动/不可达），retry 后抛异常，
+        上层 _call_chain 无 fallback 时抛出 AllProvidersFailedError，由调用方走 Mock 兜底。
+        """
+        base = self._local_base.rstrip("/")
+        print(f"[local_gateway] base={base} model={model} max_tokens={max_tokens} temp={temperature}")
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60, connect=5)) as client:
+            resp = await client.post(
+                f"{base}/chat/completions",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                },
+            )
+            if resp.status_code != 200:
+                print(f"[local_gateway ERROR] status={resp.status_code} body={resp.text[:500]}")
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"] or ""

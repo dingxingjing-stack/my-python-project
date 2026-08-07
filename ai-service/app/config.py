@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # 线上若 siliconflow key 无效/挂起，设 openrouter 直接走 OpenRouter 避免 45s 超时降级。
     primary_provider: str = "siliconflow"
 
+    # ── OpenCode 本地 Mode-A 免费网关 ──
+    # 当第三方 LLM API Key（SILICONFLOW_API_KEY / OPENROUTER_API_KEY）均未配置时，
+    # AI 任务自动转发到该网关，走 OpenAI 兼容 /chat/completions 协议的内置免费模型。
+    # 默认 http://127.0.0.1:4096/v1（opencode serve），可经 LOCAL_GATEWAY_BASE_URL 覆盖。
+    local_gateway_base_url: str = "http://127.0.0.1:4096/v1"
+    local_gateway_model: str = "opencode/free"
+
     # ── Runway MV 生成 ──
     runway_api_key: str = ""
     runway_api_base: str = "https://api.dev.runwayml.com/v1"
