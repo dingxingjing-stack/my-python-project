@@ -825,6 +825,48 @@
 
 ---
 
+## 会话记录 (2026-08-07 续) — 云端 Mode-A 网关容器内启动修复（commit `f43640a` 等，已推送+已部署）
+
+### 背景
+目标从「本地 Mode-A 网关」演进为「完全云端运行」：用户关本地电脑后仍可用，不再依赖本机 127.0.0.1。
+采用方案二：**在 Modal 容器内并行启动 opencode serve + 业务 FastAPI**。
+
+### 已完成工作
+1. **容器内多进程网关架构**（`gateway_launcher.py` + `opencode_gateway.py`）
+   - 容器内同一 Network Namespace 跑三个进程：opencode serve(:4098) + Python 翻译网关(:4096) + 业务 FastAPI(web ASGI 主进程)，127.0.0.1 互通
+   - `opencode serve` 原生只暴露 /session、/session/{id}/message、/global/health，**无 OpenAI 兼容端点**（未有提供方合并 #31724）；故自写 Python 翻译网关把 /v1/chat/completions 翻译成原生会话调用
+2. **`_install_opencode`**（image 构建期下载 v1.18.15 `opencode-linux-x64.tar.gz` 到 /root/.opencode/bin/opencode）
+3. **资源限制修复历史**：
+   - 首版用 `prlimit --nice=-5`（提高优先级）→ 容器 Docker 禁止 → "Operation not permitted"，opencode 整条命令失败未启动 → 线上首次与 web 报 `[launcher] ERROR not ready in 120s` / `[web] WARNING fall back to Mock`
+   - 改为 `ulimit -n 4096 && nice -n 15`（仅降优先级、限制文件句柄）+ `NODE_OPTIONS` 堆内存上限 + `OPENCODE_CACHE_DIR=/tmp/opencode-cache`（不开 -v 虚拟内存 cap，Node 易 OOM）
+4. **`model` 参数坑**（用 `oc_probe.py` 容器内探针定位）：容器内 opencode 无 `opencode/free`（无鉴权），实际默认模型为 `opencode/big-pickle`；向 /session/{id}/message 传 `model:"string"` 或 `model:{providerID,modelID}`=`opencode/free` 均失败 → **HTTP 500 UnknownError**
+   - 修复：网关对默认/sentinel 模型 `opencode/free`（即 `opencode/free` 或 `GATEWAY_MODEL` 二值）时**不传 model**，让 opencode 用默认 big-pickle；非默认才会拆 `provider/model` 对象携带
+   - `model` 参数必须为 `{providerID, modelID}` 对象，不能是字符串
+5. **线上部署验证（全部通过）**：
+   - `modal deploy` 成功；web 容器日志 `[launcher] gateway ready on 127.0.0.1:4096` + `[web] local Mode-A gateway is UP`
+   - 容器内探针 `chat/completions` → **200**，返回 "HALLO"（真实 opencode 生成，走 big-pickle）
+   - `/api/v1/ai/lyrics`（OpenRouter 外部 key 已配置）→ 200，真实中文歌词，model=`nvidia/nemotron-3-nano-30b-a3b:free`
+   - `/api/v1/health` → 200；`/create` → gzip Content-Encoding + Cache-Control `public, max-age=300`；`/static/js/app.js` → `public, max-age=86400, immutable`
+6. **清理**：删除临时探针 `oc_probe.py`
+
+### 关键经验教训
+- **opencode serve 本身不提供 OpenAI 兼容端点**，必须「自研翻译网关」；原生 /session + /session/{id}/message 是唯一消息通道
+- **容器内 `prlimit --nice=N`（调高优先级）被禁 → 整条 shell 命令失败** → 子进程压根没启动；只能降优先级（`nice -n 15`）+ ulimit + 堆内存限制
+- **`model` 对 opencode 原生 API 是对象 `{providerID, modelID}` 而非字符串**；且无鉴权时 `opencode/free` 不存在 → 500 UnknownError，需回退默认模型（big-pickle）
+- `modal app logs <app>` 可看 web 容器启动日志（含 [launcher]/[web] 网关就绪标记）
+- 删除工作流下 Modal 会自动回收 web
+
+### 当前 Git 状态
+- 最新提交: `f43640a`(gateway fix) + 此前 `14124c1`(container gateway 之 multi-process startup)
+- 已推送至 `origin/main`
+- 工作目录：仅 AGENTS.md 待提交（本次会话）
+
+### 待办/阻塞项
+1. 调试对齐：网关探针已证明容器内链路 200，但**业务真实链路（无第三方 key `force_local_gateway=true` 时直接走容器网关生成歌词）尚未只靠线上 payload 复测一次**（当前线上已配置 OR key，`_use_local` 判定为 false 走外部）。若需业务回归可设 `FORCE_LOCAL_GATEWAY=true` 后再跑一次 /api/v1/ai/lyrics 应返回 provider=local_gateway
+2. 更多中文超时兜底、body 大小、长会话超时（120s）仍需按需调。
+
+---
+
 ## 会话记录 (2026-08-07 续) — 本地 Mode-A 网关 + 歌词 prompt 修复 + gzip/缓存/health（commit `50fcd53`）
 
 ### 背景
