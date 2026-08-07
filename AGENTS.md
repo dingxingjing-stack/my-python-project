@@ -825,6 +825,41 @@
 
 ---
 
+## 会话记录 (2026-08-07 收尾) — P0 密钥梳理：Mureka/Runway 基建挂载（commit `682e1d4` + `837af11`，已推送+已部署）
+
+### 背景
+P0 关键链路缺口为**用户侧密钥**：Mureka（真实音乐音频）无 key、Runway 占位、SiliconFlow 402 余额不足。
+代码客户端均生产就绪，本轮补齐缺失的 Modal secret 基建与文档，让密钥"即插即用"。
+
+### 已完成工作
+1. **密钥全景（doctor 实测）**：
+   - SiliconFlow `402 balance insufficient`（chat/image），models 200 → **key 有效但账户无余额**
+   - Mureka 无 key → 音乐降级 SoundHelix/Mock
+   - Runway 占位 `your-` → MV V4.0 已用 FLUX+Agnes 替代（可选）
+   - OpenRouter ✅ 主文本通道；Agnes ✅ MV 视频通道
+2. **Modal secret 基建** (`modal_server.py`)：新建并挂载 `mureka-key`（MUREKA_API_KEY）、`runway-key`（RUNWAY_API_KEY），
+   三个 Modal 函数（web / run_mv_job / doctor）全挂载
+3. **`.env.example`**：Mureka 从废弃区移到正式区并加注册地址注释
+4. **部署验证**：health 200、gateway UP、降级警告正常，无配置回归
+
+### 用户行动清单（代码侧无法补）
+1. Mureka: https://www.mureka.ai/ 注册拿 key → 更新 `mureka-key`（Modal secret 需 delete+create 或 Dashboard 改，再 redeploy）
+2. SiliconFlow: cloud.siliconflow.cn 充值/实名 → 更新 `siliconflow-key`
+3. (可选) Runway: https://dev.runwayml.com/ 拿 key → 更新 `runway-key` 恢复动态镜头
+
+### 当前 Git 状态
+- 最新提交: `837af11`(spec report) + `682e1d4`(secrets wiring)
+- 已推送至 `origin/main`
+- Modal 已部署最新（含 mureka-key/runway-key 空挂载）
+- 剩余 P0 缺口 = 用户侧密钥（Mureka/SiliconFlow/Runway），代码零改动即可启用
+
+### 待办
+1. 用户按行动清单填 key 后 re-deploy，即可打通真实音乐/MV 外部链路
+2. P2 性能：FLUX 冷启动预热、歌词异步 job 化、MV 端到端耗时
+3. P3 技术债：网关 120s 上限、清理废弃 GPU 包装、MV 模板深度对接
+
+---
+
 ## 会话记录 (2026-08-07 收尾) — P1 优化：FORCE_LOCAL_GATEWAY 自动屏蔽存量第三方密钥（commit `fc328c0`，已推送+已部署）
 
 ### 背景
