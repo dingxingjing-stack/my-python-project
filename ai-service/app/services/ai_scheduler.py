@@ -82,7 +82,7 @@ class AIScheduler:
         # 若 openrouter 为 primary（线上 siliconflow 无效时），不再回退到 siliconflow。
         # 当第三方 LLM API Key 全部未配置时（本地/无 key 环境），
         # TEXT/CODE 自动转发到 OpenCode 本地 Mode-A 网关（OpenAI 兼容 /chat/completions 免费模型）。
-        self._use_local = not (s.siliconflow_api_key or s.openrouter_api_key)
+        self._use_local = s.force_local_gateway or not (s.siliconflow_api_key or s.openrouter_api_key)
         _use_or_first = (s.primary_provider or "siliconflow").lower() == "openrouter"
         if self._use_local:
             text_route = {

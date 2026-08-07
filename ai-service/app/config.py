@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     # 默认 http://127.0.0.1:4096/v1（opencode serve），可经 LOCAL_GATEWAY_BASE_URL 覆盖。
     local_gateway_base_url: str = "http://127.0.0.1:4096/v1"
     local_gateway_model: str = "opencode/free"
+    # 强制走本地网关（即使配置了第三方 key）。用于线上测试容器内网关链路。
+    force_local_gateway: bool = False
 
     # ── Runway MV 生成 ──
     runway_api_key: str = ""

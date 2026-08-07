@@ -8,9 +8,45 @@ REPO_ROOT = Path(__file__).parent
 # ── Image 构建阶段 ──
 # 注意: add_local_* 必须放在所有构建步骤末尾（Modal 要求）
 # ignore=["data/"] 排除本地 data 目录（SQLite DB + 上传文件），避免镜像非空目录挂载 Volume 冲突
+OPENCODE_VERSION = "v1.18.15"
+
+
+def _install_opencode():
+    """下载并安装 opencode 原生二进制（linux-x64 静态包，无需 Node）。
+
+    容器内以子进程方式运行 `opencode serve`，作为本地 Mode-A 免费网关。
+    """
+    import os
+    import pathlib
+    import shutil
+    import tarfile
+    import urllib.request
+
+    url = (
+        f"https://github.com/anomalyco/opencode/releases/download/"
+        f"{OPENCODE_VERSION}/opencode-linux-x64.tar.gz"
+    )
+    dst = "/root/.opencode/bin/opencode"
+    tmp = "/tmp/opencode.tar.gz"
+    if os.path.exists(dst):
+        return
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    print(f"[opencode] downloading {url}", flush=True)
+    urllib.request.urlretrieve(url, tmp)
+    with tarfile.open(tmp, "r:gz") as tf:
+        tf.extractall("/tmp/opencode-x")
+    for cand in pathlib.Path("/tmp/opencode-x").rglob("opencode"):
+        if cand.is_file():
+            shutil.copy(cand, dst)
+            os.chmod(dst, 0o755)
+            break
+    print(f"[opencode] installed -> {dst}", flush=True)
+
+
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg")
+    .apt_install("ffmpeg", "util-linux")
+    .run_function(_install_opencode)
     .pip_install_from_requirements(str(REPO_ROOT / "requirements.txt"))
     .env({"PYTHONPATH": "/root"})
     .add_local_dir(
@@ -324,6 +360,30 @@ def web():
     # 切换工作目录，确保 StaticFiles("static") 等相对路径能找到文件
     import os
     os.chdir(pkg_root)
+
+    # ── 容器内多进程：拉起 OpenCode 本地 Mode-A 网关 ──
+    # opencode serve(原生,4098) + OpenAI 兼容翻译网关(4096) 作为子进程在容器内运行，
+    # 三者（业务 FastAPI / opencode / 网关）共享同一容器 Network Namespace，127.0.0.1 互通。
+    # 必须等待 4096 网关就绪后再返回 FastAPI app，避免业务启动后首调才遇到 502。
+    try:
+        import sys as _sys
+        if pkg_root not in _sys.path:
+            _sys.path.insert(0, pkg_root)
+        from app.services.gateway_launcher import start_gateways, wait_ready
+        os.environ["LOCAL_GATEWAY_BASE_URL"] = os.environ.get(
+            "LOCAL_GATEWAY_BASE_URL", "http://127.0.0.1:4096/v1"
+        )
+        os.environ.setdefault("OPENCODE_BACKEND_URL", "http://127.0.0.1:4098")
+        procs = start_gateways()
+        ok = wait_ready(procs, timeout=120)
+        if not ok:
+            print("[web] WARNING: gateway not ready; business will fall back to Mock", flush=True)
+        else:
+            print("[web] local Mode-A gateway is UP", flush=True)
+    except Exception as _e:
+        import traceback
+        traceback.print_exc()
+        print(f"[web] gateway launcher error, continue without local gateway: {_e}", flush=True)
 
     # ── 延迟导入 FastAPI app ──
     from app.main import app as fastapi_app
