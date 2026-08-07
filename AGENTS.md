@@ -825,6 +825,42 @@
 
 ---
 
+## 会话记录 (2026-08-07 收尾) — P1 优化：FORCE_LOCAL_GATEWAY 自动屏蔽存量第三方密钥（commit `fc328c0`，已推送+已部署）
+
+### 背景
+已知局限（P1）：仅设 `FORCE_LOCAL_GATEWAY=true` 不足以屏蔽环境内现存第三方 LLM key —
+opencode 按 env 中 key 是否存在选择默认 provider，key 存在即优先第三方（即使失效 → 如 GLM-5V 401）。
+此前需手动清空 key 才能切本地网关，本次消除该手动步骤。
+
+### 实现（`app/services/gateway_launcher.py`）
+- 新增 `THIRD_PARTY_LLM_KEYS = ("SILICONFLOW_API_KEY", "OPENROUTER_API_KEY")`
+- 新增 `_force_local_gateway()`：读 `FORCE_LOCAL_GATEWAY`(=1/true/yes 判真)
+- `_start_opencode_backend()`：`FORCE_LOCAL_GATEWAY=true` 时从 opencode 子进程 env `pop` 掉这两把 key，
+  日志打 `[launcher] FORCE_LOCAL_GATEWAY=true: stripped third-party LLM keys from opencode env`
+- 仅影响 **opencode 后端子进程**；业务层 `_use_local = force_local_gateway or not (keys)` 已据此路由到 4096 网关
+
+### 验证
+- 本地: `python -c` 断言 force=true 时 SF/OR 被剔除、AGNES(非 LLM) 保留、force=false 不剔 ✅
+- 线上（**key 完整保留** + `FORCE_LOCAL_GATEWAY=true`）→ `/api/v1/ai/lyrics` 200
+  `provider=local_gateway` / `model=opencode/free`（免费 big-pickle，非失效 siliconflow）结构化中文 LRC
+  （冷容器 ~89s，含 boot；生成本身 ~10s）
+- 日志命中 `[launcher] FORCE_LOCAL_GATEWAY=true: stripped third-party LLM keys from opencode env`
+- 恢复生产（删 FORCE）后 → `/api/v1/ai/lyrics` 200 `provider=openrouter`
+  `model=nvidia/nemotron-3-nano-30b-a3b:free`（21.1s 正常；冷容器首次偶发 >30s→Mock 兜底为设计行为）
+
+### 待办/后续
+1. P0 密钥梳理（SiliconFlow/Mureka/Runway）补齐外部真实链路
+2. P2 性能：FLUX 冷启动预热量、歌词异步 job 化、MV 端到端耗时优化
+3. P3 技术债：网关 120s 上限、清理废弃 GPU 包装、MV 模板深度对接
+
+### 当前 Git 状态
+- 最新提交: `fc328c0` - "feat(gateway): FORCE_LOCAL_GATEWAY strips third-party LLM keys from opencode env"
+- 已推送至 `origin/main`
+- 工作目录: AGENTS.md 待提交（本次更新）
+- Modal secrets: openrouter-key/siliconflow-key 为真实值 73/51 位；avireon-config=`PRIMARY_PROVIDER=openrouter MOCK_FALLBACK=true FEATURE_STAGE=1`（无 FORCE 覆盖项）✅生产态
+
+---
+
 ## 会话记录 (2026-08-07 续) — 强制本地网关业务回归 + 启动密钥降级为可选（commit `01bb3e4`，已推送+已部署）
 
 ### 背景
