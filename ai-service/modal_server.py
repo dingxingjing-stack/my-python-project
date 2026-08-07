@@ -132,11 +132,11 @@ def musicgen_generate(prompt: str, max_new_tokens: int = 512) -> bytes:
     gpu="T4",
     memory=49152,
     timeout=60 * 15,
-    max_containers=2,
+    max_containers=1,
     scaledown_window=300,
     volumes={"/models": model_volume},
 )
-@modal.concurrent(max_inputs=2)
+@modal.concurrent(max_inputs=1)
 def flux_image_generate(prompt: str, width: int = 1024, height: int = 576, seed: int = 0) -> bytes:
     """FLUX.1-schnell (FP8 量化) 本地文生图，返回 jpg 字节。
 

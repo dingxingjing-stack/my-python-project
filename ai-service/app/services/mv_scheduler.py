@@ -28,8 +28,10 @@ from loguru import logger
 
 from app.services.local_storage import get_local_storage
 
-# 通道并发上限（对齐 Modal T4 max_inputs=2）
-_MAX_FLUX_CONCURRENCY = 2
+# 通道并发上限（对齐 Modal T4 max_inputs）
+# FLUX 冷启动多容器并发加载会导致某个容器中途 abort 残留 meta 张量 → offload 崩溃，
+# 因此生图通道串行化（单容器冷加载，规避并发 meta 崩溃）；音频通道保留 2 并发。
+_MAX_FLUX_CONCURRENCY = 1
 _MAX_SF_CONCURRENCY = 2
 _MAX_KOKORO_CONCURRENCY = 2
 
