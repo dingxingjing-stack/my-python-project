@@ -10,8 +10,8 @@ from loguru import logger
 from app.config import get_settings
 from app.database import get_db
 
-# 有效服务商列表
-VALID_PROVIDERS = ("siliconflow", "openrouter")
+# 有效服务商列表（local_gateway 为本地免费网关，不参与额度统计）
+VALID_PROVIDERS = ("siliconflow", "openrouter", "local_gateway")
 
 
 async def ensure_provider_table() -> None:
@@ -68,8 +68,11 @@ async def ensure_provider_daily_reset(provider: str) -> dict:
 
 
 async def check_provider_daily_limits(provider: str) -> dict:
-    """检查该服务商今日调用是否已达上限。"""
+    """检查该服务商今日调用是否已达上限。本地网关（local_gateway）免费，不限额度。"""
     s = get_settings()
+    if provider == "local_gateway":
+        today = date.today().isoformat()
+        return {"provider": provider, "usage_date": today, "call_count": 0}
     limit = (
         s.daily_siliconflow_calls if provider == "siliconflow"
         else s.daily_openrouter_calls
