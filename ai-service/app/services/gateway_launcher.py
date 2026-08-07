@@ -54,6 +54,18 @@ def _find_opencode() -> str:
     return "opencode"
 
 
+# 强制本地网关时要从 opencode 子进程环境中剔除的第三方 LLM 密钥。
+# opencode 按 env 中是否存在 key 来选择默认 provider；只要 key 在 env，即使失效
+# 它也会优先第三方（例：SILICONFLOW_API_KEY 存在 → 默认 siliconflow/zai-org/GLM-5V-Turbo，
+# 该 key 已失效 → 401）。要强制用本地免费模型（opencode 默认 big-pickle），必须清空这些 key。
+THIRD_PARTY_LLM_KEYS = ("SILICONFLOW_API_KEY", "OPENROUTER_API_KEY")
+
+
+def _force_local_gateway() -> bool:
+    """判断是否强制本地网关（并因此屏蔽环境内第三方 LLM 密钥）。"""
+    return os.getenv("FORCE_LOCAL_GATEWAY", "").strip().lower() in ("1", "true", "yes")
+
+
 def _start_opencode_backend(logf) -> subprocess.Popen | None:
     """启动 opencode serve，限制子进程资源。
 
@@ -63,6 +75,11 @@ def _start_opencode_backend(logf) -> subprocess.Popen | None:
     bin_path = _find_opencode()
     port = GATEWAY_BACKEND_PORT
     env = dict(os.environ)
+    # FORCE_LOCAL_GATEWAY=true 时剔除第三方 LLM 密钥，让 opencode 用默认免费模型
+    if _force_local_gateway():
+        for k in THIRD_PARTY_LLM_KEYS:
+            env.pop(k, None)
+        print("[launcher] FORCE_LOCAL_GATEWAY=true: stripped third-party LLM keys from opencode env", flush=True)
     # 限制 opencode/Node 堆内存（避免与业务进程争抢容器内存）；容器级 memory=4096 兜底
     env.setdefault("NODE_OPTIONS", "--max-old-space-size=512")
     env.setdefault("OPENCODE_CACHE_DIR", "/tmp/opencode-cache")
