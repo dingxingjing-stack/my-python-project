@@ -696,21 +696,10 @@
       },
 
       // ── Step 4: Publish ──
+      // 只保存已生成好的作品，不触发任何新的歌词/音乐生成
       async publishCreation() {
         this.publishing = true;
         try {
-          const res = await fetch('/api/v1/ai/one-click-create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt: this.form.prompt,
-              style: this.form.style,
-              language: this.form.language === 'auto' ? 'zh' : this.form.language,
-              generate_mv: !!this.form.video_url,
-            }),
-          });
-          const data = await res.json();
-
           const saveRes = await fetch('/api/v1/creations/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

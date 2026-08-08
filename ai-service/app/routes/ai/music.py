@@ -14,6 +14,7 @@ import uuid
 import random
 import asyncio
 import json
+import pathlib
 from typing import Optional, Dict, Any
 
 import httpx
@@ -41,6 +42,9 @@ _http_client: Optional[httpx.AsyncClient] = None
 # ── 简易内存任务存储（用于前端轮询） ──
 _job_store: Dict[str, Dict[str, Any]] = {}
 
+# HeartMuLa 进程级并发信号量：Modal max_inputs=1，串行化避免并发触发 concurrency 异常被误判为配额降级
+_heartmula_sem = asyncio.Semaphore(1)
+
 def _create_job(result: Dict[str, Any]) -> str:
     """创建任务并返回 job_id"""
     job_id = uuid.uuid4().hex[:8]
@@ -54,6 +58,38 @@ def _create_job(result: Dict[str, Any]) -> str:
 def _get_job(job_id: str) -> Optional[Dict[str, Any]]:
     """获取任务状态"""
     return _job_store.get(job_id)
+
+
+# ── 跨容器 job 状态文件持久化（共享卷，与 mv.py 同款模式） ──
+def _music_status_dir() -> pathlib.Path:
+    """跨容器状态目录 = data/music_jobs（共享卷上）。"""
+    from app.services.local_storage import get_local_storage
+    base = get_local_storage()._base  # .../data/uploads
+    d = base.parent / "music_jobs"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _write_music_job_status(job_id: str, payload: dict) -> None:
+    """将任务状态写成 JSON 文件（共享卷）。整文件写入/替换，跨容器一致。"""
+    try:
+        p = _music_status_dir() / f"{job_id}.json"
+        tmp = p.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(p)
+    except Exception as exc:
+        print(f"[generate] 状态文件写失败 job={job_id}: {exc}", flush=True)
+
+
+def _read_music_job_status_file(job_id: str) -> Optional[dict]:
+    """读取共享卷上的任务状态文件（跨容器轮询主通道）。"""
+    try:
+        p = _music_status_dir() / f"{job_id}.json"
+        if not p.exists():
+            return None
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
 # ── 全局单例 ──
 _http_client: Optional[httpx.AsyncClient] = None
@@ -164,9 +200,14 @@ class JobSubmitResponse(BaseModel):
 @router.post("/generate")
 @require_feature("ai_music")
 async def generate_music(request: GenerateRequest):
+    # 0) 每日额度检查（与 lyrics 等 AI 调用一致），超限直接 429
+    from app.services.usage_tracker import check_daily_limits
+    await check_daily_limits(user_id=1, action="ai_music")
+
     # 1) 先创建任务，返回 job_id 供前端轮询
     job_id = uuid.uuid4().hex[:8]
     _job_store[job_id] = {"status": "queued", "progress": 0, "result": None, "error": None}
+    _write_music_job_status(job_id, _job_store[job_id])
     
     # 后台异步跑生成，避免阻塞返回
     asyncio.create_task(_run_generation(job_id, request))
@@ -180,6 +221,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
         # 更新状态
         _job_store[job_id]["status"] = "processing"
         _job_store[job_id]["progress"] = 10
+        _write_music_job_status(job_id, _job_store[job_id])
         
         prompt = request.prompt.strip()
         if len(prompt) < 5:
@@ -225,12 +267,14 @@ async def _run_generation(job_id: str, request: GenerateRequest):
                 hm_lyrics = (request.lyrics or final_prompt or request.prompt).strip()
                 hm_tags = _build_heartmula_tags(request.style)
                 hm_duration = min(request.duration or 60, 120)
-                hm = await heartmula_generate(
-                    lyrics=hm_lyrics,
-                    tags=hm_tags,
-                    language="pt",
-                    duration=hm_duration,
-                )
+                # 进程级串行化：HeartMuLa Modal max_inputs=1，避免并发触发 concurrency 异常被误判为配额降级
+                async with _heartmula_sem:
+                    hm = await heartmula_generate(
+                        lyrics=hm_lyrics,
+                        tags=hm_tags,
+                        language="pt",
+                        duration=hm_duration,
+                    )
                 if hm and hm.get("mp3"):
                     uploader = _get_cdn_uploader()
                     import tempfile
@@ -258,6 +302,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
                             "hm_detail": hm_meta,
                         }
                         _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
+                        _write_music_job_status(job_id, _job_store[job_id])
                         return
                     print("[generate] HeartMuLa CDN 上传失败 → 降级到第 2 层")
                 else:
@@ -284,6 +329,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
                     "agnes_debug": agnes_debug,
                 }
                 _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
+                _write_music_job_status(job_id, _job_store[job_id])
                 return
         except QuotaExceededError:
             print("[generate] 第 2 层失败: Mureka 配额耗尽 → 降级到第 3 层 HF")
@@ -304,11 +350,13 @@ async def _run_generation(job_id: str, request: GenerateRequest):
                 "agnes_debug": agnes_debug,
             }
             _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
+            _write_music_job_status(job_id, _job_store[job_id])
             return
 
         # 第 4 层：Mock 示例音频兜底
         if not MOCK_FALLBACK_ENABLED:
             _job_store[job_id] = {"status": "failed", "progress": 100, "result": None, "error": "所有 AI 引擎均不可用，且 MOCK 已被关闭"}
+            _write_music_job_status(job_id, _job_store[job_id])
             return
 
         _job_store[job_id]["progress"] = 90
@@ -326,14 +374,17 @@ async def _run_generation(job_id: str, request: GenerateRequest):
             "agnes_debug": agnes_debug,
         }
         _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
+        _write_music_job_status(job_id, _job_store[job_id])
 
     except HTTPException:
         _job_store[job_id] = {"status": "failed", "progress": 100, "result": None, "error": "HTTP Exception"}
+        _write_music_job_status(job_id, _job_store[job_id])
     except Exception as e:
         import traceback
         print(f"[generate 未捕获] {type(e).__name__}: {e}")
         traceback.print_exc()
         _job_store[job_id] = {"status": "failed", "progress": 100, "result": None, "error": f"{type(e).__name__}: {e}"}
+        _write_music_job_status(job_id, _job_store[job_id])
     finally:
         dur_ms = int((time.time() - t_start) * 1000)
         fin = _job_store[job_id]
@@ -344,7 +395,10 @@ async def _run_generation(job_id: str, request: GenerateRequest):
 
 @router.get("/job/{job_id}")
 async def get_job_status(job_id: str):
-    """查询生成任务状态 — 前端轮询用，先查 _job_store（音乐生成实际写入的位置），降级查 task_state_machine。"""
+    """查询生成任务状态 — 前端轮询用。
+
+    优先级：内存 _job_store（快速路径）→ 共享卷状态文件（跨容器兜底）→ task_state_machine。
+    """
     # 1. 优先查 _job_store（music.py 内部写入的实际位置）
     job = _job_store.get(job_id)
     if job:
@@ -355,6 +409,10 @@ async def get_job_status(job_id: str):
             "result": job.get("result"),
             "error": job.get("error"),
         }
+    # 2. 共享卷状态文件（跨容器轮询兜底）
+    file_status = _read_music_job_status_file(job_id)
+    if file_status:
+        return {"job_id": job_id, **file_status}
     # 2. 降级查 task_state_machine（供 create.py 等用例写入的位置）
     try:
         from app.services.task_state_machine import get_task
