@@ -350,12 +350,34 @@ def kokoro_tts(text: str, voice: str = "", speed: float = 1.0) -> bytes:
 
 _HEARTMULA_CKPT = "/models/heartmula-ckpt"
 
+# ── HeartMuLa 模块级单例缓存 ──
+# warm 容器内多次调用复用已加载的权重（首个调用 ~15-24s 加载，后续 ~秒级，无需重读磁盘）。
+# 权重常驻 CPU（model bf16 ~3.9GB + codec fp32 ~1.7GB），每次调用 `model.to(cuda)` 移到 GPU、
+# 生成后移回 CPU，与 codec 不同利共存（T4 15GB 放不下两者同驻）：
+#   PoC 实测: model bf16 加载 ~7.3GB、setup_caches 后 ~10GB、推理峰值 ~10.4GB；codec fp32 detokenize 峰值另需
+#   ~3-4GB → 必须错峰。scaledown_window 需 > 单次生成耗时，保证容器存活窗口内缓存复用。
+_HM_CACHE = {"paths": None, "model": None, "codec": None}
+
+
+def _heartmula_load_paths():
+    from heartlib.pipelines.music_generation import _resolve_paths, HeartMuLaGenConfig
+    from tokenizers import Tokenizer
+
+    mula_path, codec_path, tok_path, gcfg_path = _resolve_paths(_HEARTMULA_CKPT, "3B")
+    return {
+        "mula_path": mula_path,
+        "codec_path": codec_path,
+        "tokenizer": Tokenizer.from_file(tok_path),
+        "gcfg": HeartMuLaGenConfig.from_file(gcfg_path),
+    }
+
 
 @app.function(
     image=heartmula_image,
     gpu="T4",
     timeout=60 * 45,
     max_containers=1,
+    scaledown_window=1800,
     memory=16384,
     volumes={"/models": heartmula_volume},
 )
@@ -373,6 +395,7 @@ def heartmula_generate(
     HeartMuLa.from_pretrained(path, device_map=cuda, dtype=bfloat16) + 手动帧循环 +
     HeartCodec.detokenize([2,T]) → WAV → ffmpeg MP3。
     权重已缓存到 heartmula-models 卷（/models/heartmula-ckpt），无外部 API key。
+    model 模块级缓存：warm 容器内第二首起跳过 ~24s 权重加载（scaledown_window=1800s）。
     """
     import os
     import pathlib
@@ -391,14 +414,12 @@ def heartmula_generate(
 
     t0 = time.time()
 
-    from heartlib.pipelines.music_generation import _resolve_paths, HeartMuLaGenConfig
-    from heartlib.heartmula.modeling_heartmula import HeartMuLa
-    from heartlib.heartcodec.modeling_heartcodec import HeartCodec
-    from tokenizers import Tokenizer
-
-    mula_path, codec_path, tok_path, gcfg_path = _resolve_paths(_HEARTMULA_CKPT, "3B")
-    tokenizer = Tokenizer.from_file(tok_path)
-    gcfg = HeartMuLaGenConfig.from_file(gcfg_path)
+    cache = _HM_CACHE
+    if cache["paths"] is None:
+        cache["paths"] = _heartmula_load_paths()
+    paths = cache["paths"]
+    tokenizer = paths["tokenizer"]
+    gcfg = paths["gcfg"]
 
     def _wrap(s):
         s = s.lower()
@@ -411,7 +432,7 @@ def heartmula_generate(
             ids = ids + [gcfg.text_eos_id]
         return ids
 
-    tags_ids = _wrap(tags if tags else f"show, {language}, song, instrumental")
+    tags_ids = _wrap(tags if tags else "show, " + language + ", song, instrumental")
     lyrics_ids = _wrap(lyrics)
     prompt_len = len(tags_ids) + 1 + len(lyrics_ids)
     tokens = torch.zeros([prompt_len, 9], dtype=torch.long)
@@ -430,7 +451,18 @@ def heartmula_generate(
     muq_embed = muq_embed.to("cuda")
     pos = pos.to("cuda")
 
-    model = HeartMuLa.from_pretrained(mula_path, device_map=torch.device("cuda"), dtype=torch.bfloat16)
+    # ── 加载/复用 HeartMuLa model（warm 复用核心） ──
+    from heartlib.heartmula.modeling_heartmula import HeartMuLa
+    hm_warm = cache["model"] is not None
+    if cache["model"] is None:
+        model = HeartMuLa.from_pretrained(
+            paths["mula_path"], device_map=torch.device("cpu"), dtype=torch.bfloat16
+        )
+        cache["model"] = model
+    else:
+        model = cache["model"]
+    # 错峰：生成阶段 model 独占 GPU（codec 暂居 CPU）
+    model = model.to("cuda")
     model.setup_caches(1)
     t1 = time.time()
 
@@ -466,13 +498,28 @@ def heartmula_generate(
     frames = torch.stack(frames_out).permute(1, 2, 0).squeeze(0)
     t2 = time.time()
 
-    del model
+    # 错峰：生成完毕，将 model 移回 CPU，为 codec 腾出 GPU 显存（T4 15GB 放不下两者同驻）
+    torch.cuda.empty_cache()
+    model = model.to("cpu")
+    cache["model"] = model
     torch.cuda.empty_cache()
 
-    codec = HeartCodec.from_pretrained(codec_path, device_map=torch.device("cuda"), dtype=torch.float32)
+    from heartlib.heartcodec.modeling_heartcodec import HeartCodec
+    if cache["codec"] is None:
+        codec = HeartCodec.from_pretrained(
+            paths["codec_path"], device_map=torch.device("cpu"), dtype=torch.float32
+        )
+        cache["codec"] = codec
+    else:
+        codec = cache["codec"]
+    codec = codec.to("cuda")
     frames_dev = frames.to(codec.device)
     wav = codec.detokenize(frames_dev)
     t3 = time.time()
+    wav = wav.to("cpu")
+    codec = codec.to("cpu")
+    cache["codec"] = codec
+    torch.cuda.empty_cache()
 
     wav_float = wav.to(torch.float32).cpu()
     data = wav_float.numpy()
@@ -491,16 +538,19 @@ def heartmula_generate(
 
     mp3_data = mp3_path.read_bytes()
     size = len(mp3_data)
+    peak_gb = torch.cuda.max_memory_allocated() / 1024**3 if torch.cuda.is_available() else 0
     return {
         "status": "ok",
         "mp3": mp3_data,
         "size": size,
+        "warm": hm_warm,
         "load_s": round(t1 - t0, 1),
         "gen_frames": len(frames_out),
         "gen_s": round(t2 - t1, 1),
         "codec_s": round(t3 - t2, 1),
         "total_s": round(t4 - t0, 1),
         "duration_s": round(len(frames_out) * 0.08, 1),
+        "peak_alloc_gb": round(peak_gb, 2),
     }
 
 
