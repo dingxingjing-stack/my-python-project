@@ -29,6 +29,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from app.config import get_settings
 from app.database import get_db
+from app.services.language_registry import lyrics_prompt_name
 
 
 class AITaskType(str, Enum):
@@ -297,14 +298,7 @@ class AIScheduler:
         vocal: str = "auto",
         user_id: int = 1,
     ) -> AIResult:
-        lang_map = {
-            "zh": "Chinese (简体中文)",
-            "en": "English",
-            "ja": "Japanese (日本語)",
-            "ko": "Korean (한국어)",
-            "es": "Spanish (Español)",
-        }
-        lang_name = lang_map.get(language, language or "English")
+        lang_name = lyrics_prompt_name(language)
         system = f"""You are a professional songwriter. Write emotionally engaging, singable lyrics.
 Lyrics language: {lang_name}. All lyrics must be in this language.
 Always return in this format: output ONLY the final lyrics with the exact structure below.

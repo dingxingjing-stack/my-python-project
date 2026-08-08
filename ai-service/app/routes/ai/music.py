@@ -31,10 +31,11 @@ HF_FALLBACK_ENABLED = os.getenv("HF_FALLBACK", "true").lower() in ("1", "true", 
 MOCK_FALLBACK_ENABLED = os.getenv("MOCK_FALLBACK", "true").lower() in ("1", "true", "yes")
 
 
-def _build_heartmula_tags(style: str) -> str:
-    """按风格生成 HeartMuLa 音乐标签（tags 词条带 <tag> 前缀由模型侧补）。"""
+def _build_heartmula_tags(style: str, vocal_word: str = "Portuguese") -> str:
+    """按风格生成 HeartMuLa 音乐标签（tags 词条带 <tag> 前缀由模型侧补）。
+    vocal_word 来自 Language Registry（如 Portuguese/Chinese），不再硬编码单一语言。"""
     style_word = (style or "pop").lower().replace("-", " ").replace("&", "and")
-    return f"show <{style_word}>, {style_word}, Portuguese, female vocal, song, romantic, 96 bpm"
+    return f"show <{style_word}>, {style_word}, {vocal_word}, female vocal, song, romantic, 96 bpm"
 
 # ── 全局单例 ──
 _http_client: Optional[httpx.AsyncClient] = None
@@ -255,24 +256,28 @@ async def _run_generation(job_id: str, request: GenerateRequest):
 
         _job_store[job_id]["progress"] = 35
 
-        # ── 语言分流：pt 走 HeartMuLa 本地生成 ──
-        # 仅当 language=pt 且 lyrics 可用时启用；失败自动降级后续层。
+        # ── 语言分流：Registry 判定的 HeartMuLa 通道（当前仅 pt verified） ──
+        # resolve_music_provider() 只对 music_verified=True 的语言返回 "heartmula"，
+        # 未实测语言（zh/en/es/ja/ko）保持 external，不强制进入本地生成。
+        from app.services.language_registry import resolve_music_provider, get as get_lang_cap
+
         language = (request.language or "").lower()
-        if language == "pt":
-            print("[generate] Language=pt → HeartMuLa 本地生成...")
+        lang_cap = get_lang_cap(language)
+        if resolve_music_provider(language) == "heartmula":
+            print(f"[generate] Language={language} → HeartMuLa 本地生成...")
             _job_store[job_id]["progress"] = 40
             try:
                 from app.services.modal_gpu_client import heartmula_generate
 
                 hm_lyrics = (request.lyrics or final_prompt or request.prompt).strip()
-                hm_tags = _build_heartmula_tags(request.style)
+                hm_tags = _build_heartmula_tags(request.style, lang_cap.heartmula_vocal_word)
                 hm_duration = min(request.duration or 60, 120)
                 # 进程级串行化：HeartMuLa Modal max_inputs=1，避免并发触发 concurrency 异常被误判为配额降级
                 async with _heartmula_sem:
                     hm = await heartmula_generate(
                         lyrics=hm_lyrics,
                         tags=hm_tags,
-                        language="pt",
+                        language=language,
                         duration=hm_duration,
                     )
                 if hm and hm.get("mp3"):

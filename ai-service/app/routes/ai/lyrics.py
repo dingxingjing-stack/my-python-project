@@ -172,102 +172,15 @@ def _parse_lyrics(text: str) -> dict:
     return result
 
 
-_MOCK_LYRICS = {
-    "ja": """Verse 1:
-星が窓辺に降り注ぐ
-夜は水のように優しく
-心の中の歌が
-風に乗って遠くへ
-
-Chorus:
-夢を追う人は決して疲れない
-嵐を越えて優雅に
-僕たちはみんな旅の途中
-心の光へ走り続ける
-
-LRC:
-[00:00.00]星が窓辺に降り注ぐ
-[00:05.00]夜は水のように優しく
-[00:10.00]心の中の歌が
-[00:15.00]風に乗って遠くへ""",
-
-    "ko": """Verse 1:
-별빛이 창가에 내려와
-밤은 물처럼 부드럽게
-마음속의 그 노래가
-바람을 타고 멀리 멀리
-
-Chorus:
-꿈을 찾는 우리는 멈추지 않아
-폭풍을 가로질러
-우린 모두 여정 중이야
-마음속의 빛을 향해 달려가
-
-LRC:
-[00:00.00]별빛이 창가에 내려와
-[00:05.00]밤은 물처럼 부드럽게
-[00:10.00]마음속의 그 노래가
-[00:15.00]바람을 타고 멀리 멀리""",
-
-    "es": """Verse 1:
-La luz de las estrellas sobre la ventana
-La noche es suave como el agua
-La cancion de mi corazon
-Flota lejos con el viento
-
-Chorus:
-Los sonadores nunca se cansan
-Atravesando la tormenta con gracia
-Todos estamos en el camino
-Corriendo hacia la luz interior
-
-LRC:
-[00:00.00]La luz de las estrellas
-[00:05.00]La noche es suave como el agua
-[00:10.00]La cancion de mi corazon
-[00:15.00]Flota lejos con el viento""",
-
-    "zh": """Verse 1:
-星光落在窗前
-夜色温柔如水
-心中那首歌谣
-随风轻轻飘远
-
-Chorus:
-追梦的人永不疲倦
-穿越风雨也从容
-我们都在路上
-奔向心中的光
-
-LRC:
-[00:00.00]星光落在窗前
-[00:05.00]月色温柔如水
-[00:10.00]心中那首歌谣
-[00:15.00]随风轻轻飘远""",
-
-    "en": """Verse 1:
-Starlight falls upon the garden
-Night is gentle as the water
-The song inside my heart
-Drifts away with the wind
-
-Chorus:
-Dreamers never tire
-Walking through the storm with grace
-We are all on the road
-Running toward the light within
-
-LRC:
-[00:00.00]Starlight falls upon the garden
-[00:05.00]Night is gentle as the water
-[00:10.00]The song inside my soul
-[00:15.00]Drifts away with the wind""",
-}
-
-
 def _build_mock_lyrics(prompt: str, style: str, language: str) -> str:
-    lang = (language or "en").lower()
+    """Mock 兜底歌词：统一从 Language Registry 读模板，不再按语言写特例。"""
+    from app.services.language_registry import get as get_lang_cap
+
+    cap = get_lang_cap(language)
+    mock = cap.mock_template
+    if not mock:
+        # 该语言无预置模板 → 回退默认英文，仍走 Registry，避免 if pt/zh/es 特例
+        from app.services.language_registry import get as _reg_get
+        mock = _reg_get("en").mock_template
     base = prompt[:20] if prompt else "Untitled"
-    if lang not in _MOCK_LYRICS:
-        lang = "en"
-    return "Title: {}\n\n{}".format(base, _MOCK_LYRICS[lang])
+    return "Title: {}\n\n{}".format(base, mock)
