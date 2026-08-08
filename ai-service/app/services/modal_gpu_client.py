@@ -112,3 +112,24 @@ async def kokoro_tts(
             raise GPUQuotaError(str(exc)[:200]) from exc
         print(f"[modal-gpu] kokoro_tts 失败: {type(exc).__name__}: {exc}", flush=True)
         return None
+
+
+async def heartmula_generate(
+    lyrics: str,
+    tags: str = "",
+    language: str = "pt",
+    duration: int = 60,
+    timeout: float = 2700.0,
+) -> Optional[dict]:
+    """调用 Modal HeartMuLa 3B 本地生成音乐，返回 dict{mp3字节+元数据}；失败返回 None。"""
+    try:
+        fn = _get_function("heartmula_generate")
+        return await asyncio.wait_for(
+            fn.remote.aio(lyrics=lyrics, tags=tags, language=language, duration=duration),
+            timeout,
+        )
+    except Exception as exc:
+        if _is_quota_exception(exc):
+            raise GPUQuotaError(str(exc)[:200]) from exc
+        print(f"[modal-gpu] heartmula_generate 失败: {type(exc).__name__}: {exc}", flush=True)
+        return None

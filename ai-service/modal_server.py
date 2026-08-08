@@ -65,6 +65,38 @@ data_volume = modal.Volume.from_name("avireon-data-v2", create_if_missing=True)
 # 模型权重通过 HF 本地下载缓存到 model_volume，无需任何外部 API key
 model_volume = modal.Volume.from_name("avireon-models-v1", create_if_missing=True)
 
+# ── HeartMuLa 3B + HeartCodec 独立卷 / 镜像 ──
+# 权重已由 avireon-heartmula-poc 下载到 heartmula-models（/models/heartmula-ckpt/...），
+# 与 avireon-models-v1 完全隔离，不共享 HF_HOME。
+heartmula_volume = modal.Volume.from_name("heartmula-models", create_if_missing=True)
+
+heartmula_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .apt_install("ffmpeg", "libsndfile1", "git")
+    .pip_install(
+        "torch>=2.4,<2.11",
+        "torchaudio>=2.4,<2.11",
+        "torchcodec",
+        "torchvision>=0.19,<0.26",
+        "transformers==4.57.0",
+        "tokenizers==0.22.1",
+        "torchtune==0.4.0",
+        "torchao==0.9.0",
+        "accelerate==1.12.0",
+        "bitsandbytes==0.49.0",
+        "einops==0.8.1",
+        "vector-quantize-pytorch==1.27.15",
+        "soundfile",
+        "tqdm==4.67.1",
+    )
+    .pip_install("git+https://github.com/HeartMuLa/heartlib.git@main")
+    .env({
+        "HF_HOME": "/models/hf",
+        "PYTHONIOENCODING": "utf-8",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+    })
+)
+
 gpu_image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg", "espeak-ng")
@@ -314,6 +346,162 @@ def kokoro_tts(text: str, voice: str = "", speed: float = 1.0) -> bytes:
     buf = io.BytesIO()
     sf.write(buf, audio, 24000, format="WAV")
     return buf.getvalue()
+
+
+_HEARTMULA_CKPT = "/models/heartmula-ckpt"
+
+
+@app.function(
+    image=heartmula_image,
+    gpu="T4",
+    timeout=60 * 45,
+    max_containers=1,
+    memory=16384,
+    volumes={"/models": heartmula_volume},
+)
+@modal.concurrent(max_inputs=1)
+def heartmula_generate(
+    lyrics: str = "",
+    tags: str = "",
+    language: str = "pt",
+    duration: int = 60,
+    cfg_scale: float = 1.0,
+) -> dict:
+    """HeartMuLa 3B + HeartCodec 本地生成音乐，返回 MP3 字节。
+
+    使用低层推理路径（HeartMuLaGenPipeline dtype 有 bug 会 fp32 OOM，必须走此路径）：
+    HeartMuLa.from_pretrained(path, device_map=cuda, dtype=bfloat16) + 手动帧循环 +
+    HeartCodec.detokenize([2,T]) → WAV → ffmpeg MP3。
+    权重已缓存到 heartmula-models 卷（/models/heartmula-ckpt），无外部 API key。
+    """
+    import os
+    import pathlib
+    import subprocess
+    import time
+
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    import torch
+
+    os.makedirs("/models/hf", exist_ok=True)
+    tmp = pathlib.Path("/tmp/heartmula")
+    tmp.mkdir(parents=True, exist_ok=True)
+    label = f"hm-{int(time.time())}"
+    wav_path = tmp / (label + ".wav")
+    mp3_path = tmp / (label + ".mp3")
+
+    t0 = time.time()
+
+    from heartlib.pipelines.music_generation import _resolve_paths, HeartMuLaGenConfig
+    from heartlib.heartmula.modeling_heartmula import HeartMuLa
+    from heartlib.heartcodec.modeling_heartcodec import HeartCodec
+    from tokenizers import Tokenizer
+
+    mula_path, codec_path, tok_path, gcfg_path = _resolve_paths(_HEARTMULA_CKPT, "3B")
+    tokenizer = Tokenizer.from_file(tok_path)
+    gcfg = HeartMuLaGenConfig.from_file(gcfg_path)
+
+    def _wrap(s):
+        s = s.lower()
+        if not s.startswith("<tag>"):
+            s = "<tag>" + s
+        ids = tokenizer.encode(s).ids
+        if ids[0] != gcfg.text_bos_id:
+            ids = [gcfg.text_bos_id] + ids
+        if ids[-1] != gcfg.text_eos_id:
+            ids = ids + [gcfg.text_eos_id]
+        return ids
+
+    tags_ids = _wrap(tags if tags else f"show, {language}, song, instrumental")
+    lyrics_ids = _wrap(lyrics)
+    prompt_len = len(tags_ids) + 1 + len(lyrics_ids)
+    tokens = torch.zeros([prompt_len, 9], dtype=torch.long)
+    tokens[: len(tags_ids), -1] = torch.tensor(tags_ids)
+    tokens[len(tags_ids) + 1 :, -1] = torch.tensor(lyrics_ids)
+    tokens = tokens.unsqueeze(0)  # [1, seq, parallel]
+    tokens_mask = torch.zeros([prompt_len, 9], dtype=torch.bool)
+    tokens_mask[:, -1] = True
+    tokens_mask = tokens_mask.unsqueeze(0)
+    muq_embed = torch.zeros([512], dtype=torch.bfloat16).unsqueeze(0)  # [1, 512]
+    muq_idx = len(tags_ids)
+    pos = torch.arange(prompt_len, dtype=torch.long).unsqueeze(0)
+
+    tokens = tokens.to("cuda")
+    tokens_mask = tokens_mask.to("cuda")
+    muq_embed = muq_embed.to("cuda")
+    pos = pos.to("cuda")
+
+    model = HeartMuLa.from_pretrained(mula_path, device_map=torch.device("cuda"), dtype=torch.bfloat16)
+    model.setup_caches(1)
+    t1 = time.time()
+
+    frames_out = []
+    with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+        curr = model.generate_frame(
+            tokens=tokens, tokens_mask=tokens_mask, input_pos=pos,
+            temperature=1.0, topk=50, cfg_scale=cfg_scale,
+            continuous_segments=muq_embed, starts=[muq_idx],
+        )
+    frames_out.append(curr[0:1])
+
+    def _pad(tok):
+        padded = torch.ones((tok.shape[0], 9), device=tok.device, dtype=torch.long) * gcfg.empty_id
+        padded[:, :-1] = tok
+        padded = padded.unsqueeze(1)
+        pmask = torch.ones_like(padded, dtype=torch.bool)
+        pmask[..., -1] = False
+        return padded, pmask
+
+    max_frames = min(int(duration) * 1000 // 80, 7500)
+    for i in range(max_frames):
+        ct, cm = _pad(curr)
+        with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            curr = model.generate_frame(
+                tokens=ct, tokens_mask=cm, input_pos=pos[:, -1:] + i + 1,
+                temperature=1.0, topk=50, cfg_scale=cfg_scale,
+                continuous_segments=None, starts=None,
+            )
+        frames_out.append(curr[0:1])
+        if torch.any(curr[0:1] >= gcfg.audio_eos_id):
+            break
+    frames = torch.stack(frames_out).permute(1, 2, 0).squeeze(0)
+    t2 = time.time()
+
+    del model
+    torch.cuda.empty_cache()
+
+    codec = HeartCodec.from_pretrained(codec_path, device_map=torch.device("cuda"), dtype=torch.float32)
+    frames_dev = frames.to(codec.device)
+    wav = codec.detokenize(frames_dev)
+    t3 = time.time()
+
+    wav_float = wav.to(torch.float32).cpu()
+    data = wav_float.numpy()
+    if data.ndim == 3:
+        data = data.squeeze(0)
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+    import soundfile as sf
+
+    sf.write(str(wav_path), data.T if data.ndim == 2 else data, 48000, subtype="PCM_16")
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav_path), str(mp3_path)],
+        check=True, timeout=120,
+    )
+    t4 = time.time()
+
+    mp3_data = mp3_path.read_bytes()
+    size = len(mp3_data)
+    return {
+        "status": "ok",
+        "mp3": mp3_data,
+        "size": size,
+        "load_s": round(t1 - t0, 1),
+        "gen_frames": len(frames_out),
+        "gen_s": round(t2 - t1, 1),
+        "codec_s": round(t3 - t2, 1),
+        "total_s": round(t4 - t0, 1),
+        "duration_s": round(len(frames_out) * 0.08, 1),
+    }
 
 
 @app.function(

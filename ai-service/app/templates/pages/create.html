@@ -88,6 +88,7 @@
               <option value="ja">{{ _('日本語') }}</option>
               <option value="ko">{{ _('한국어') }}</option>
               <option value="es">{{ _('Español') }}</option>
+              <option value="pt">{{ _('Português') }}</option>
             </select>
           </div>
           <div>
@@ -570,6 +571,7 @@
               title: this.form.title || undefined,
               lyrics: this.form.lyrics || undefined,
               instrumental: false,
+              language: this.form.language === 'auto' ? 'zh' : this.form.language,
             }),
           });
           const data = await res.json();

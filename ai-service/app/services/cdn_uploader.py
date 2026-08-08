@@ -13,8 +13,13 @@ class CDNUploader:
     """上传文件到 CDN（优先 R2，未配置时回退本地存储）。"""
 
     def __init__(self):
-        self._r2 = get_uploader()
+        self._r2 = None
         self._local = get_local_storage()
+        try:
+            from app.services.r2_uploader import get_uploader
+            self._r2 = get_uploader()
+        except Exception as e:
+            print(f"[CDNUploader] R2 不可用（走本地存储）: {e}")
 
     async def upload_audio(self, file_path: str) -> Optional[str]:
         """上传音频文件，返回可公开访问的 URL。"""
@@ -23,12 +28,13 @@ class CDNUploader:
         ext = path.suffix.lstrip(".") or "mp3"
 
         # 优先 R2
-        try:
-            url = self._r2.upload_audio(data, ext=ext)
-            if url:
-                return url
-        except Exception:
-            pass
+        if self._r2 is not None:
+            try:
+                url = self._r2.upload_audio(data, ext=ext)
+                if url:
+                    return url
+            except Exception:
+                pass
 
         # 回退本地存储
         try:

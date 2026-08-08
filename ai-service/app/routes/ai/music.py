@@ -29,6 +29,12 @@ router = APIRouter(prefix="/ai", tags=["ai-music"])
 HF_FALLBACK_ENABLED = os.getenv("HF_FALLBACK", "true").lower() in ("1", "true", "yes")
 MOCK_FALLBACK_ENABLED = os.getenv("MOCK_FALLBACK", "true").lower() in ("1", "true", "yes")
 
+
+def _build_heartmula_tags(style: str) -> str:
+    """按风格生成 HeartMuLa 音乐标签（tags 词条带 <tag> 前缀由模型侧补）。"""
+    style_word = (style or "pop").lower().replace("-", " ").replace("&", "and")
+    return f"show <{style_word}>, {style_word}, Portuguese, female vocal, song, romantic, 96 bpm"
+
 # ── 全局单例 ──
 _http_client: Optional[httpx.AsyncClient] = None
 
@@ -135,6 +141,10 @@ class GenerateRequest(BaseModel):
     style: str = "pop"
     duration: Optional[int] = None
     type: str = "song"
+    title: Optional[str] = None
+    lyrics: Optional[str] = None
+    language: Optional[str] = None
+    instrumental: bool = False
 
 
 class GenerateResponse(BaseModel):
@@ -202,6 +212,58 @@ async def _run_generation(job_id: str, request: GenerateRequest):
             final_prompt = agnes_result.generated_lyrics.strip()
 
         _job_store[job_id]["progress"] = 35
+
+        # ── 语言分流：pt 走 HeartMuLa 本地生成 ──
+        # 仅当 language=pt 且 lyrics 可用时启用；失败自动降级后续层。
+        language = (request.language or "").lower()
+        if language == "pt":
+            print("[generate] Language=pt → HeartMuLa 本地生成...")
+            _job_store[job_id]["progress"] = 40
+            try:
+                from app.services.modal_gpu_client import heartmula_generate
+
+                hm_lyrics = (request.lyrics or final_prompt or request.prompt).strip()
+                hm_tags = _build_heartmula_tags(request.style)
+                hm_duration = min(request.duration or 60, 120)
+                hm = await heartmula_generate(
+                    lyrics=hm_lyrics,
+                    tags=hm_tags,
+                    language="pt",
+                    duration=hm_duration,
+                )
+                if hm and hm.get("mp3"):
+                    uploader = _get_cdn_uploader()
+                    import tempfile
+                    import pathlib as _pathlib
+
+                    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tf:
+                        tf.write(hm["mp3"])
+                        tf.flush()
+                        tmp_path = tf.name
+                    try:
+                        audio_url = await uploader.upload_audio(tmp_path)
+                    finally:
+                        try:
+                            _pathlib.Path(tmp_path).unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                    if audio_url:
+                        hm_meta = {k: v for k, v in hm.items() if k != "mp3"}
+                        result = {
+                            "success": True,
+                            "audio_url": audio_url,
+                            "task_id": f"heartmula-{uuid.uuid4().hex[:6]}",
+                            "ai_provider": f"{ai_provider}+heartmula",
+                            "agnes_debug": agnes_debug,
+                            "hm_detail": hm_meta,
+                        }
+                        _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
+                        return
+                    print("[generate] HeartMuLa CDN 上传失败 → 降级到第 2 层")
+                else:
+                    print("[generate] HeartMuLa 返回空 → 降级到第 2 层")
+            except Exception as e:
+                print(f"[generate] HeartMuLa 异常 {type(e).__name__}: {e} → 降级到第 2 层")
 
         # ── 第 2 层：Mureka 生成音频 ──
         print("[generate] 第 2 层: Mureka 生成音频...")
