@@ -155,6 +155,26 @@
         <textarea x-model="form.lyrics" rows="16"
                   class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none resize-y font-mono text-sm leading-relaxed"></textarea>
 
+        <!-- Voice Preview (TTS) -->
+        <div class="mt-4 bg-gray-900 rounded-xl p-4 border border-gray-800">
+          <h3 class="text-sm font-semibold text-gray-400 uppercase mb-3">{{ _('Voice Preview') }}</h3>
+          <div class="flex gap-2">
+            <input x-model="ttsText" :placeholder="form.lyrics ? '{{ _('Lyrics ready — preview how it sounds') }}' : '{{ _('Type any text to listen') }}'"
+                   class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 text-sm focus:border-purple-500 focus:outline-none">
+            <button @click.self="ttsText = form.lyrics" :disabled="!form.lyrics"
+                    class="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 disabled:opacity-40 transition">
+              ⇧
+            </button>
+          </div>
+          <button @click="generateTts()" :disabled="ttsGenerating || !ttsText.trim()"
+                  class="mt-3 w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium transition flex items-center justify-center gap-2">
+            <span x-show="ttsGenerating" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            <span x-text="ttsGenerating ? 'Generating Voice...' : '🔊 Generate Voice'"></span>
+          </button>
+          <p x-show="ttsError" class="mt-2 text-xs text-red-400" x-text="ttsError"></p>
+          <audio x-show="ttsAudioUrl" x-ref="ttsAudio" :src="ttsAudioUrl" controls class="mt-3 w-full"></audio>
+        </div>
+
         <div class="flex gap-3 mt-4">
           <button @click="regenerateLyrics()" :disabled="loading"
                   class="flex-1 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium transition">
@@ -393,6 +413,12 @@
       lyricsVersion: 1,
       lyricsVersions: [],
 
+      // TTS (text to speech)
+      ttsText: '',
+      ttsGenerating: false,
+      ttsError: '',
+      ttsAudioUrl: '',
+
       // Music
       musicVersions: [],
       selectedVersion: 0,
@@ -551,6 +577,47 @@
       switchLyricsVersion() {
         const v = this.lyricsVersions.find(v => v.num === this.lyricsVersion);
         if (v) this.form.lyrics = v.lyrics;
+      },
+
+      // ── TTS: Text → Speech（本地 Kokoro） ──
+      async generateTts() {
+        if (this.ttsGenerating) return;
+        const text = (this.ttsText || '').trim();
+        if (!text) {
+          this.ttsError = '请输入要朗读的文本';
+          return;
+        }
+        this.ttsGenerating = true;
+        this.ttsError = '';
+        this.ttsAudioUrl = '';
+        const idemKey = crypto.randomUUID();
+        try {
+          const res = await fetch('/api/v1/ai/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idemKey },
+            body: JSON.stringify({ text: text, voice: '' }),
+          });
+          if (res.status === 429) {
+            const data = await res.json();
+            this.showModalMsg('额度不足', data.detail || '今日免费额度已用尽，请明日再试。');
+            this.ttsGenerating = false;
+            return;
+          }
+          const data = await res.json();
+          if (data.data?.audio_url) {
+            this.ttsAudioUrl = data.data.audio_url;
+            this.$nextTick(() => {
+              const audio = this.$refs.ttsAudio;
+              if (audio) audio.play().catch(() => {});
+            });
+          } else {
+            this.ttsError = data.detail || 'TTS 生成失败，请稍后重试。';
+          }
+        } catch (e) {
+          console.error('TTS generation failed:', e);
+          this.ttsError = '语音生成失败，请稍后重试。';
+        }
+        this.ttsGenerating = false;
       },
 
       // ── Step 2: Generate Music ──

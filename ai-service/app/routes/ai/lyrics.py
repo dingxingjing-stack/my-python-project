@@ -14,8 +14,8 @@ from app.services.feature_flags import require_feature
 router = APIRouter(prefix="/ai", tags=["ai-lyrics"])
 
 MOCK_FALLBACK_ENABLED = os.getenv("MOCK_FALLBACK", "true").lower() in ("1", "true", "yes")
-# 歌词生成总超时（外部 LLM 或本地网关）+ 语法解析兜底恢复
-LYRICS_TIMEOUT_SECS = int(os.getenv("LYRICS_TIMEOUT_SECS", "30"))
+# 歌词生成总超时（外部 LLM 或本地网关）。默认 60s，覆盖 Stage 6 实测慢调用（21–38s），可用 LYRICS_TIMEOUT_SECS 覆盖。
+LYRICS_TIMEOUT_SECS = int(os.getenv("LYRICS_TIMEOUT_SECS", "60"))
 
 
 @router.post("/lyrics")
