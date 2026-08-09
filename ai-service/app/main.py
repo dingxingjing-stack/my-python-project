@@ -227,6 +227,10 @@ def _register_routers(app: FastAPI) -> None:
     from app.routes.ai.voice import router as ai_voice_router
     app.include_router(ai_voice_router, prefix="/api/v1")
 
+    # ── AI: 文本转语音（本地 Kokoro TTS） ──
+    from app.routes.ai.tts import router as ai_tts_router
+    app.include_router(ai_tts_router, prefix="/api/v1")
+
     # ── AI: 一键创作 ──
     from app.routes.ai.create import router as ai_create_router
     app.include_router(ai_create_router, prefix="/api/v1")
