@@ -317,18 +317,40 @@ async def _run_generation(job_id: str, request: GenerateRequest):
 
         # ── 第 2 层：Mureka 生成音频 ──
         print("[generate] 第 2 层: Mureka 生成音频...")
+        mureka_duration = min(request.duration or 60, 300)
         mureka_request = MurekaSongRequest(
             lyrics=final_prompt,
             style=request.style,
-            duration=request.duration,
+            duration=mureka_duration,
         )
         _job_store[job_id]["progress"] = 45
         try:
             mureka_result = await mureka_service.generate_song(mureka_request)
             if mureka_result.success:
+                audio_url = mureka_result.audio_url
+                # 回源：拉取远端音频 → 上传本地 CDN，保证 URL 稳定；失败回退原 URL
+                mp3_bytes = await mureka_service.fetch_audio(mureka_result.audio_url)
+                if mp3_bytes:
+                    uploader = _get_cdn_uploader()
+                    import pathlib as _pathlib
+
+                    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tf:
+                        tf.write(mp3_bytes)
+                        tf.flush()
+                        tmp_path = tf.name
+                    try:
+                        local_url = await uploader.upload_audio(tmp_path)
+                    finally:
+                        try:
+                            _pathlib.Path(tmp_path).unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                    if local_url:
+                        audio_url = local_url
+                        print(f"[generate] 第 2 层 Mureka 音频已回源上传: {local_url}")
                 result = {
                     "success": True,
-                    "audio_url": mureka_result.audio_url,
+                    "audio_url": audio_url,
                     "task_id": mureka_result.task_id,
                     "ai_provider": f"{ai_provider}+mureka",
                     "agnes_debug": agnes_debug,

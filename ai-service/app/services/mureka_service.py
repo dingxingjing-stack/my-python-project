@@ -41,6 +41,24 @@ class MurekaService:
         self.api_key = os.getenv("MUREKA_API_KEY", "")
         self._configured = bool(self.api_key)
 
+    async def fetch_audio(self, audio_url: str) -> Optional[bytes]:
+        """下载 Mureka 生成的远端音频为字节流，供回源上传 CDN。
+
+        失败返回 None（调用方自行回退为原 URL）。
+        """
+        if not audio_url:
+            return None
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.get(audio_url)
+            if resp.status_code != 200:
+                print(f"[Mureka] 音频下载失败 {resp.status_code}: {audio_url[:120]}")
+                return None
+            return resp.content
+        except Exception as e:
+            print(f"[Mureka] 音频下载异常: {e}")
+            return None
+
     async def generate_song(self, req: MurekaSongRequest) -> MurekaResult:
         if not self._configured:
             print("[Mureka] 未配置 API Key，抛出 QuotaExceededError 触发降级")
