@@ -1002,3 +1002,55 @@ opencode 按 env 中 key 是否存在选择默认 provider，key 存在即优先
 - 最新提交: `50fcd53`（已推送）
 - 工作目录未提交: `AGENTS.md`（本次会话更新）
 - 本地 server 已用新代码重启，运行于 `http://127.0.0.1:8000`
+
+---
+
+## 会话记录 (2026-08-08) — Stage 6 全球语言真实测试（只测不改）
+
+### 基线
+- commit `581cfaa845b25b9992d1db2b15d6f2e1ac817fd7`（已 push `origin/main`）。探索（explore.html/static/home.html）未提交属历史遗留，禁止触碰。
+- 现状：`music_verified` 仅 pt=True；zh/en/es/ja/ko=False → HTTPS `resolve_music_provider` 返回 external。
+- 硬约束：零代码/Registry/music_verified/HeartMuLa/quota 修改。配额经 `admin/users/1/quota`（daily_ai_calls_limit=500）以授权方式提升，记录于 DB override 表。
+
+### 实测结论（每语言：LLM 歌词 → 直连 `heartmula_generate` → MP3 → faster-whisper ASR）
+| 语言 | 歌词 | HeartT 直连 | MP3 | whisper 演唱语言 | 分类 |
+|------|------|------------|-----|------------------|------|
+| zh | 真实中文（星光轻声） | ✅ 45s/721KB/166s cold | 可播 | **zh 0.969** | **A 可进生产** |
+| ja | 真实日语（星の約束） | ✅ 45s/721KB/145s warm | 可播 | **ja 0.947** | **A 可进生产** |
+| en | 真实英文（Starlight Whisper） | ✅ 45s MP3 | 可播 | 仅“Oh”“Thanks for watching!”，无实质英文演唱 | **B 语言不可靠** |
+| es | 真实西语（Brilla la Noche） | ✅ 45s MP3 | 可播 | 无西语人声（whisper 判定噪声/amara） | **B 语言不可靠** |
+| ko | 真实韩语（별빛 속의 속삭임） | ❌ CUDA device-side assert 崩溃 | 无 | — | **D 技术问题** |
+
+- MP3 四语言字节大小全同（721,389B）= CBR 128k 编码伪现象，SHA-256 全不同 → 内容真实随语言变化；volumedetect 非静音。
+- **技术坑**：HeartT Modal 容器 `scaledown_window=1800s`；ko 生成中途 `CUDA device-side assert` 崩溃 → **该 warm 容器被毒化**，之后的任何调用（含 pt 对照组）都在 4s 内同错。语言无关的环境失误，需容器过期重建后再复测 ko。
+- HTTP gate 设计行为确认：`POST /api/v1/ai/generate` zh (verified=False) → `provider=agens+mock`（SoundHelix）；无 429，符合 Registry 门控。
+
+### 产物
+- 报告：`ai-service/reports/2026-08-08_stage6_lang_validation.md`（13 检查点 + 分类表 + 决策项）
+- 测试脚本存临时目录：`%TEMP%\opencode\`（test_heartmula.py / whisper_*.py / heartmula_results.json 等）
+
+### 待用户决策（不改代码前提下）
+1. zh/ja 是否翻 `music_verified=True`（后续可让 HTTPS 直接进 HeartT）。
+2. en/es 接受 B 或配 Mureka/Runway 外部音频复测。
+3. ko 待 Modal 容器冷却/重建后复测（同一 job CPU/功能不改，确认临时性还是稳定故障）。
+
+### Stage 6-B 独立复测与故障隔离（2026-08-08 深夜）
+- **方法**：每语言用**独立全新 cold 容器**（检测到 ko 容毒后等待 HeatMuLa `scaledown_window=1800s` 完全回收，`get_current_stats().num_total_runners==0` 才起下一个；长 sleep 用轮询循环防中断）。
+- **zh 确认**：cold run → whisper **zh 0.959**（Round1 0.969），真实中文演唱成立。
+- **ja 确认**：cold run（`warm=false`, load 35s）→ whisper **ja 0.742**（Round1 0.947；本次仍日语但置信回落，属生成方差）。
+- **ko 判定**：全新 cold 容器 **成功**（mp3 721KB, `warm=false`）→ whisper 检测 `ko`（内容 스토/마늘/봄의…含 Hangul，置信 0.3 较低但语言对）。**Round-1 CUDA assert = 临时容器污染（ko 中途崩溃毒化 warm 容器），非语言/输入稳定性问题**。
+- **en/es**：保持 `verified=False`，未复测（用户指令暂不翻 flag，下阶段再论外部 Provider）。
+- **pt smoke（控制组）**：全新 cold 容器通过 — 直连 OK（322KB/20.08s, `warm=false`）+ HTTP 全链路 `provider=agnes+heartmula`、`audio_url=/uploads/audio/*.mp3` 可下载可播放 → **pt 未受 ko CUDA 崩溃影响**。
+- **HTTP smoke 注意**：`/api/v1/ai/generate` 空 prompt 会触发 line 229「提示词至少需要 5 字」4130→ 上下调用需传真实 prompt（本次 pt 传了葡语 prompt）。
+- **经验**：Modal 1.5.3 无 function stop；回收 cold 用轮询 `get_current_stats()`；`scaledown_window=1800` 内只增不减，探测即重置 idle。
+
+### 待用户决策（Stage 6-B 后）
+1. **A. zh 可正式 verified** —— 证据：Round1 cold zh 0.969 + 独立冷复测 zh 0.959 → 真实中文人声；建议翻 `music_verified=True`（待用户拍板）。
+2. **B. ja 谨慎 verified** —— 证据 ja 0.947/0.742 双 exam专项一致为日语；建议可用；但 0.742 那轮人声略弱，翻旗前若用户在意可再抽验。
+3. **C. ko** —— 判定为容器污染造成（cold run 成功）；但 whisper ko prob=0.3 较低，演唱语言置信弱 → 需要的话再抽验；不应以 0.3 置信逢 true。
+4. **D. pt 未受影响** —— 对照 cold+HTTP 双通过。
+5. **E. en/es** —— 建议**值得**配外部 Provider（Mureka/Runway）复测，因本地 HeartT 无可靠英文/西语人声（仅 Oh/噪声）。
+
+### 当前 Git 状态
+- 最新提交: `581cfaa`（基线，已 push）；工作目录含未提交：AGENTS.md、`reports/2026-08-08_stage6_lang_validation.md`
+- 未触碰：`explore.html`/`static/home.html`（历史遗留已忽略）。
