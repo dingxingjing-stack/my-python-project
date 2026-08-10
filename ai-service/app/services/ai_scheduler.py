@@ -162,12 +162,15 @@ class AIScheduler:
         job_id: Optional[str] = None,
         request_id: Optional[str] = None,
         disable_fallback: bool = False,
+        skip_accounting: bool = False,
     ) -> AIResult:
         """
         统一调度入口 — 自动降级、幂等检查、状态机、限额检查、双 Provider 限流。
 
         参数:
           disable_fallback: True 时只尝试 primary，不降级。
+          skip_accounting: True 时跳过用户每日额度检查/记账（用于内部子调用，
+            避免与上层功能重复记账；provider 级限流仍保留）。
         """
         from app.services.task_state_machine import (
             create_task, transition, update_task_output, TaskStatus,
@@ -191,8 +194,9 @@ class AIScheduler:
                 logger.info("[Dispatch] Idempotent hit: request_id={}", request_id)
                 return AIResult(text=cached.get("text", ""), model_name=route["primary"][1], provider=route["primary"][0])
 
-        # 用户每日总限额
-        await check_daily_limits(user_id, action)
+        # 用户每日总限额（内部子调用跳过，避免与上层功能重复扣减）
+        if not skip_accounting:
+            await check_daily_limits(user_id, action)
 
         # 生成任务 ID
         tid = job_id or generate_task_id()
@@ -222,7 +226,8 @@ class AIScheduler:
         # 写入结果
         await update_task_output(tid, text[:5000])
         await transition(tid, TaskStatus.COMPLETED)
-        await record_usage(user_id, action, 0)
+        if not skip_accounting:
+            await record_usage(user_id, action, 0)
 
         # 记录该 provider 的调用次数
         await record_provider_usage(provider)
@@ -429,6 +434,9 @@ MV Style: {mv_style}"""
             max_tokens=800,
             credit_action="mv",
             user_id=user_id,
+            # MV 路由已单独做 mv 配额记账（check_mv_daily_limits / record_mv_usage），
+            # storyboard 作为内部子调用跳过通用记账，避免重复扣减。
+            skip_accounting=True,
         )
 
     async def generate_scene_image(

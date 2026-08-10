@@ -178,6 +178,7 @@ async def record_usage(user_id: int, action: str, credits_used: int = 0) -> None
     from app.services.feature_flags import rate_tier
 
     today = date.today().isoformat()
+    await ensure_daily_reset(user_id)
     db = await get_db()
 
     heavy_inc = ""
@@ -231,6 +232,43 @@ async def check_mv_cost(user_id: int) -> tuple[bool, int]:
     row = await cur.fetchone()
     mv_used = row["mv_count"] if row else 0
     return (mv_used < mv_limit), 0
+
+
+async def record_mv_usage(user_id: int) -> None:
+    """记录一次 MV 生成（独立计入 mv_count + ai_calls_count + global）。"""
+    today = date.today().isoformat()
+    await ensure_daily_reset(user_id)
+    db = await get_db()
+    await db.execute(
+        "UPDATE daily_usage SET mv_count = mv_count + 1, ai_calls_count = ai_calls_count + 1 "
+        "WHERE user_id = ? AND usage_date = ?",
+        (user_id, today),
+    )
+    await db.execute(
+        "INSERT INTO global_daily_stats (stat_date, total_ai_calls, total_mv_count) "
+        "VALUES (?, 1, 1) ON CONFLICT(stat_date) DO UPDATE SET "
+        "total_ai_calls = total_ai_calls + 1, total_mv_count = total_mv_count + 1",
+        (today,),
+    )
+    await db.commit()
+
+
+async def check_mv_daily_limits(user_id: int) -> None:
+    """检查用户今日 MV 生成次数是否已达上限（daily_mv_slots / override），超限抛 429。"""
+    s = get_settings()
+    today = date.today().isoformat()
+    await ensure_daily_reset(user_id)
+    db = await get_db()
+    override = await _get_user_quota_override(user_id)
+    mv_limit = override.get("daily_mv_limit") or s.daily_mv_slots
+    cur = await db.execute(
+        "SELECT mv_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
+        (user_id, today),
+    )
+    row = await cur.fetchone()
+    mv_used = row["mv_count"] if row else 0
+    if mv_used >= mv_limit:
+        raise HTTPException(429, f"今日 MV 生成次数已达上限（{mv_limit} 次），请明日再试。")
 
 
 async def add_bonus_generation(user_id: int) -> None:

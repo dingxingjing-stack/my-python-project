@@ -105,6 +105,9 @@ class AgnesMusicService:
                     temperature=0.7,
                     max_tokens=1024,
                     disable_fallback=False,
+                    # 内部子调用：上层 music 路由已做 check_daily_limits/record_usage，
+                    # 这里跳过用户记账避免重复扣减（provider 限流仍保留）。
+                    skip_accounting=True,
                 ),
                 timeout=180,
             )

@@ -15,20 +15,27 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import tempfile
+import time
 import uuid
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 
+from app.config import get_settings
 from app.database import get_db
 from app.services.ai_scheduler import get_scheduler
 from app.services.local_storage import get_local_storage
 from app.services.feature_flags import require_feature
 
 router = APIRouter(prefix="/ai", tags=["ai-mv"])
+
+# MV 顶层总超时（秒）：默认 config.task_timeout_minutes（30min），可用 MV_TIMEOUT_SECS 覆盖。
+# 超过该时长 job 置 failed 终止，避免永久停留在 processing。
+MV_TIMEOUT_SECS = int(os.getenv("MV_TIMEOUT_SECS", str(get_settings().task_timeout_minutes * 60)))
 
 # 内存任务存储（与 music.py 的 job 轮询模式一致）
 _mv_job_store: dict[str, dict] = {}
@@ -74,8 +81,8 @@ def _read_job_status_file(job_id: str) -> dict | None:
 async def generate_mv_full(request: Request):
     """MV 全流程生成 — 异步任务，立即返回 job_id，前端轮询 /ai/mv/job/{job_id}。
 
-    三层降级：Agnes 免费视频 → Modal CogVideoX → FFmpeg 幻灯片；
-    音乐：Modal MusicGen → SoundHelix 免费背景音乐。
+    图片：Flux 本地 → SiliconFlow SDXL → FFmpeg 幻灯片；
+    音频：优先使用用户已生成的歌曲 audio_url；无则 Kokoro TTS → SoundHelix 兜底。
     """
     req = await request.json()
     user_id = req.get("user_id", 1)
@@ -84,9 +91,14 @@ async def generate_mv_full(request: Request):
     mv_style = req.get("style", "Cinematic")
     num_scenes = int(req.get("num_scenes", 1) or 1)
     creation_id = req.get("creation_id")
+    audio_url = req.get("audio_url", "")
 
     if not lyrics:
         raise HTTPException(400, "Missing lyrics")
+
+    # MV 每日额度检查（mv_count / daily_mv_slots），超限直接 429
+    from app.services.usage_tracker import check_mv_daily_limits, record_mv_usage
+    await check_mv_daily_limits(user_id)
 
     job_id = str(uuid.uuid4())[:8]
     _mv_job_store[job_id] = {
@@ -94,7 +106,11 @@ async def generate_mv_full(request: Request):
         "progress": 0,
         "result": None,
         "error": None,
+        "started_at": time.time(),
     }
+
+    # MV 属于重型资源：提交即占用当日额度（与音乐一致，防止恶意刷提交占满 GPU）
+    await record_mv_usage(user_id)
 
     db = await get_db()
     await db.execute(
@@ -104,14 +120,14 @@ async def generate_mv_full(request: Request):
     await db.commit()
 
     # 优先用 Modal 独立函数容器执行（容器存活=任务运行期，避免 web 容器回收打断）
-    spawned = _spawn_modal_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id)
+    spawned = _spawn_modal_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id, audio_url)
     if not spawned:
-        asyncio.create_task(_run_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id))
+        asyncio.create_task(_run_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id, audio_url))
 
     return {"job_id": job_id}
 
 
-def _spawn_modal_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id) -> bool:
+def _spawn_modal_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id, audio_url="") -> bool:
     """尝试通过 Modal Function.from_name spawn 后台任务；失败返回 False 走本地 asyncio。"""
     try:
         import modal
@@ -124,6 +140,7 @@ def _spawn_modal_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, cr
             mv_style=mv_style,
             num_scenes=num_scenes,
             creation_id=creation_id,
+            audio_url=audio_url,
         )
         print(f"[MV] job={job_id} 已通过 Modal 独立容器后台执行", flush=True)
         return True
@@ -137,16 +154,31 @@ async def get_mv_job_status(job_id: str):
     """查询 MV 生成任务状态 — 前端轮询用。
 
     优先级：共享卷状态文件（跨容器最可靠）→ SQLite → 内存 store。
+
+    超时终态保护：若 job 已超 MV_TIMEOUT_SECS 仍未结束（容器被回收/异常早退），
+    轮询侧直接判定 failed，避免前端永久 processing。
     """
+    def _stale(fs: dict) -> bool:
+        started = fs.get("started_at") or 0
+        return fs.get("status") == "processing" and started and (time.time() - started) > MV_TIMEOUT_SECS
+
     # 1) 共享卷状态文件（Modal 独立容器写入，web 容器读取）
     file_status = _read_job_status_file(job_id)
     if file_status:
+        if _stale(file_status):
+            file_status = {
+                "status": "failed", "progress": 100, "result": None,
+                "error": f"MV 生成超时（>{MV_TIMEOUT_SECS}s）",
+                "started_at": file_status.get("started_at"),
+            }
+            _write_job_status(job_id, file_status)
+            print(f"[MV-POLL] job={job_id} processing 超时，标记 failed", flush=True)
         return {"job_id": job_id, **file_status}
 
     # 2) SQLite 兜底
     db = await get_db()
     cur = await db.execute(
-        "SELECT status, error_message, ai_response, model_name FROM generation_jobs WHERE job_id=? ORDER BY id DESC LIMIT 1",
+        "SELECT status, error_message, ai_response, model_name, created_at FROM generation_jobs WHERE job_id=? ORDER BY id DESC LIMIT 1",
         (job_id,),
     )
     row = await cur.fetchone()
@@ -169,6 +201,25 @@ async def get_mv_job_status(job_id: str):
                 "result": None,
                 "error": row["error_message"],
             }
+        # processing/queued 且超时 → 终态 failed
+        if status in ("processing", "queued") and (not file_status):
+            created = row["created_at"]
+            if isinstance(created, str):
+                try:
+                    import datetime
+                    created_ts = datetime.datetime.fromisoformat(created).timestamp()
+                except Exception:
+                    created_ts = 0
+            else:
+                created_ts = (created.timestamp() if created else 0)
+            if created_ts and (time.time() - created_ts) > MV_TIMEOUT_SECS:
+                return {
+                    "job_id": job_id,
+                    "status": "failed",
+                    "progress": 100,
+                    "result": None,
+                    "error": f"MV 生成超时（>{MV_TIMEOUT_SECS}s）",
+                }
         return {
             "job_id": job_id,
             "status": status,
@@ -184,35 +235,43 @@ async def get_mv_job_status(job_id: str):
     raise HTTPException(404, "Job not found")
 
 
-async def _run_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id):
+async def _run_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, creation_id, audio_url=""):
     """后台任务：跑完整 MV 生成链路，结果写入内存 store + SQLite（供跨容器轮询）。
 
     可能运行于本地 asyncio.create_task（内存 store 已初始化）或 Modal 独立容器
     （内存 store 为空），因此先补一个本地 store 条目，最终以 SQLite 为准。
+
+    顶层总超时：整个链路受 MV_TIMEOUT_SECS 限制，超时置 failed 终止，
+    避免 job 永久停留在 processing。
     """
     if job_id not in _mv_job_store:
-        _mv_job_store[job_id] = {"status": "queued", "progress": 0, "result": None, "error": None}
+        _mv_job_store[job_id] = {"status": "queued", "progress": 0, "result": None, "error": None, "started_at": time.time()}
     _mv_job_store[job_id]["status"] = "processing"
     _mv_job_store[job_id]["progress"] = 5
-    _write_job_status(job_id, {"status": "processing", "progress": 5, "result": None, "error": None})
+    _write_job_status(job_id, {"status": "processing", "progress": 5, "result": None, "error": None, "started_at": _mv_job_store[job_id].get("started_at", time.time())})
     t0 = asyncio.get_running_loop().time()
     try:
         scheduler = get_scheduler()
-        video_url = await _generate_mv_from_lyrics(
-            lyrics=lyrics,
-            title=title,
-            mv_style=mv_style,
-            num_scenes=num_scenes,
-            user_id=user_id,
-            creation_id=creation_id,
-            scheduler=scheduler,
-            job_id=job_id,
+        video_url = await asyncio.wait_for(
+            _generate_mv_from_lyrics(
+                lyrics=lyrics,
+                title=title,
+                mv_style=mv_style,
+                num_scenes=num_scenes,
+                user_id=user_id,
+                creation_id=creation_id,
+                scheduler=scheduler,
+                job_id=job_id,
+                audio_url=audio_url,
+            ),
+            timeout=MV_TIMEOUT_SECS,
         )
         _mv_job_store[job_id] = {
             "status": "completed",
             "progress": 100,
             "result": {"video_url": video_url},
             "error": None,
+            "started_at": _mv_job_store[job_id].get("started_at", time.time()),
         }
         _write_job_status(job_id, _mv_job_store[job_id])
         # 结果写入 SQLite，供跨容器轮询
@@ -225,6 +284,25 @@ async def _run_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, crea
             await db.commit()
         except Exception as exc:
             print(f"[MV] 结果写库失败: {exc}", flush=True)
+    except asyncio.TimeoutError:
+        print(f"[MV] job={job_id} 生成总超时（>{MV_TIMEOUT_SECS}s），任务终止", flush=True)
+        _mv_job_store[job_id] = {
+            "status": "failed",
+            "progress": 100,
+            "result": None,
+            "error": f"MV 生成超时（>{MV_TIMEOUT_SECS}s），请稍后重试",
+            "started_at": _mv_job_store[job_id].get("started_at", time.time()),
+        }
+        _write_job_status(job_id, _mv_job_store[job_id])
+        try:
+            db = await get_db()
+            await db.execute(
+                "UPDATE generation_jobs SET status='failed', error_message=? WHERE job_id=?",
+                (f"MV 生成超时（>{MV_TIMEOUT_SECS}s）", job_id),
+            )
+            await db.commit()
+        except Exception:
+            pass
     except Exception as exc:
         print(f"[MV] job={job_id} 异常: {type(exc).__name__}: {exc}", flush=True)
         import traceback as _tb
@@ -234,6 +312,7 @@ async def _run_mv_job(job_id, user_id, lyrics, title, mv_style, num_scenes, crea
             "progress": 100,
             "result": None,
             "error": f"{type(exc).__name__}: {exc}",
+            "started_at": _mv_job_store[job_id].get("started_at", time.time()),
         }
         _write_job_status(job_id, _mv_job_store[job_id])
         try:
@@ -332,8 +411,13 @@ async def _generate_mv_from_lyrics(
     creation_id: Optional[int] = None,
     scheduler=None,
     job_id: str = "",
+    audio_url: str = "",
 ) -> str:
-    """完整 MV 链路：分镜 → 图片序列（Flux→SiliconFlow）→ Kokoro/SoundHelix 音频 → FFmpeg 淡入淡出合成。"""
+    """完整 MV 链路：分镜 → 图片序列（Flux→SiliconFlow）→ 音频 → FFmpeg 淡入淡出合成。
+
+    音频优先级：用户已生成的歌曲 audio_url（C1/C2 语义断链修复）→
+    Kokoro TTS（朗读歌词）→ SoundHelix 背景音乐。
+    """
     if scheduler is None:
         from app.services.ai_scheduler import get_scheduler
         scheduler = get_scheduler()
@@ -385,10 +469,15 @@ async def _generate_mv_from_lyrics(
     if scene_images:
         print(f"[MV] 图片序列 {len(scene_images)} 张")
 
-    # Step 3: 音频（Kokoro 本地 TTS → SoundHelix 兜底）
-    audio_url, audio_channel = await mv_sched.generate_music(lyrics, title, mv_style, storage)
+    # Step 3: 音频（优先用户已生成歌曲 → Kokoro 本地 TTS → SoundHelix 兜底）
+    audio_url = (audio_url or "").strip()
     if audio_url:
-        print(f"[MV] 音频通道={audio_channel}")
+        audio_channel = "user-song"
+        print(f"[MV] 音频通道={audio_channel}（用户已生成歌曲 {audio_url}）")
+    else:
+        audio_url, audio_channel = await mv_sched.generate_music(lyrics, title, mv_style, storage)
+        if audio_url:
+            print(f"[MV] 音频通道={audio_channel}")
 
     # 若 GPU 配额耗尽且图片全部失败：返回友好错误而非脏渲染
     if mv_sched.gpu_quota_exhausted and not scene_images:

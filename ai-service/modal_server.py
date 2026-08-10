@@ -654,6 +654,7 @@ def run_mv_job(
     mv_style: str,
     num_scenes: int,
     creation_id: int,
+    audio_url: str = "",
 ):
     """独立容器执行 MV 全流程生成 — 容器存活期=任务运行期，不被 web 容器回收打断。
 
@@ -683,6 +684,7 @@ def run_mv_job(
             mv_style=mv_style,
             num_scenes=num_scenes,
             creation_id=creation_id,
+            audio_url=audio_url,
         )
 
     asyncio.run(_entry())

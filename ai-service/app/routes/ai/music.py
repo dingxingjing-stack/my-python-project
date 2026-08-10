@@ -24,11 +24,17 @@ from pydantic import BaseModel
 from app.services.mureka_service import mureka_service, MurekaSongRequest, QuotaExceededError
 from app.services.agnes_music_service import agnes_service, AgnesSongRequest
 from app.services.feature_flags import require_feature
+from app.services.usage_tracker import record_usage
 
 router = APIRouter(prefix="/ai", tags=["ai-music"])
 
 HF_FALLBACK_ENABLED = os.getenv("HF_FALLBACK", "true").lower() in ("1", "true", "yes")
 MOCK_FALLBACK_ENABLED = os.getenv("MOCK_FALLBACK", "true").lower() in ("1", "true", "yes")
+# 音乐生成顶层总超时（秒）：覆盖整个降级链，防止异常情况下长时间无限等待。
+# 默认取 config.task_timeout_minutes（30min）；可用 MUSIC_TIMEOUT_SECS 覆盖。
+from app.config import get_settings as _get_settings
+
+MUSIC_TIMEOUT_SECS = int(os.getenv("MUSIC_TIMEOUT_SECS", str(_get_settings().task_timeout_minutes * 60)))
 
 
 def _build_heartmula_tags(style: str, vocal_word: str = "Portuguese") -> str:
@@ -207,17 +213,40 @@ async def generate_music(request: GenerateRequest):
 
     # 1) 先创建任务，返回 job_id 供前端轮询
     job_id = uuid.uuid4().hex[:8]
-    _job_store[job_id] = {"status": "queued", "progress": 0, "result": None, "error": None}
+    _job_store[job_id] = {"status": "queued", "progress": 0, "result": None, "error": None, "started_at": time.time()}
     _write_music_job_status(job_id, _job_store[job_id])
     
-    # 后台异步跑生成，避免阻塞返回
+    # 后台异步跑生成，避免阻塞返回；顶层总超时由 _run_generation 内部 wait_for 保证
     asyncio.create_task(_run_generation(job_id, request))
     
     return {"job_id": job_id}
 
 async def _run_generation(job_id: str, request: GenerateRequest):
-    """后台任务：真正跑生成流程，完成后写入 _job_store"""
+    """后台任务：真正跑生成流程，完成后写入 _job_store。
+
+    顶层总超时：整个降级链受 MUSIC_TIMEOUT_SECS 限制，超时置 failed 终止，
+    避免异常情况下 job 长时间无限停留在 processing。
+    """
     t_start = time.time()
+    try:
+        await asyncio.wait_for(_run_generation_inner(job_id, request), timeout=MUSIC_TIMEOUT_SECS)
+    except asyncio.TimeoutError:
+        print(f"[generate] job={job_id} 生成总超时（>{MUSIC_TIMEOUT_SECS}s），任务终止")
+        _job_store[job_id] = {
+            "status": "failed", "progress": 100, "result": None,
+            "error": f"生成超时（>{MUSIC_TIMEOUT_SECS}s），请稍后重试",
+        }
+        _write_music_job_status(job_id, _job_store[job_id])
+    finally:
+        dur_ms = int((time.time() - t_start) * 1000)
+        fin = _job_store[job_id]
+        fin["finished_at"] = time.time()
+        fin["duration_ms"] = dur_ms
+        print(f"[generate] job={job_id} status={fin.get('status')} elapsed={dur_ms}ms", flush=True)
+
+
+async def _run_generation_inner(job_id: str, request: GenerateRequest):
+    """实际生成链路（被顶层超时包裹）。"""
     try:
         # 更新状态
         _job_store[job_id]["status"] = "processing"
@@ -308,6 +337,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
                         }
                         _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
                         _write_music_job_status(job_id, _job_store[job_id])
+                        await record_usage(user_id=1, action="ai_music")
                         return
                     print("[generate] HeartMuLa CDN 上传失败 → 降级到第 2 层")
                 else:
@@ -357,6 +387,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
                 }
                 _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
                 _write_music_job_status(job_id, _job_store[job_id])
+                await record_usage(user_id=1, action="ai_music")
                 return
         except QuotaExceededError:
             print("[generate] 第 2 层失败: Mureka 配额耗尽 → 降级到第 3 层 HF")
@@ -378,6 +409,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
             }
             _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
             _write_music_job_status(job_id, _job_store[job_id])
+            await record_usage(user_id=1, action="ai_music")
             return
 
         # 第 4 层：Mock 示例音频兜底
@@ -399,6 +431,7 @@ async def _run_generation(job_id: str, request: GenerateRequest):
             "task_id": f"mock-{hash(prompt) & 0xffffff:06x}-{uuid.uuid4().hex[:6]}",
             "ai_provider": f"{ai_provider}+mock",
             "agnes_debug": agnes_debug,
+            "is_mock": True,
         }
         _job_store[job_id] = {"status": "completed", "progress": 100, "result": result, "error": None}
         _write_music_job_status(job_id, _job_store[job_id])
@@ -412,12 +445,6 @@ async def _run_generation(job_id: str, request: GenerateRequest):
         traceback.print_exc()
         _job_store[job_id] = {"status": "failed", "progress": 100, "result": None, "error": f"{type(e).__name__}: {e}"}
         _write_music_job_status(job_id, _job_store[job_id])
-    finally:
-        dur_ms = int((time.time() - t_start) * 1000)
-        fin = _job_store[job_id]
-        fin["finished_at"] = time.time()
-        fin["duration_ms"] = dur_ms
-        print(f"[generate] job={job_id} status={fin.get('status')} elapsed={dur_ms}ms", flush=True)
 
 
 @router.get("/job/{job_id}")
@@ -439,6 +466,16 @@ async def get_job_status(job_id: str):
     # 2. 共享卷状态文件（跨容器轮询兜底）
     file_status = _read_music_job_status_file(job_id)
     if file_status:
+        # 超时终态保护：进程重启后遗留的 processing 状态，超过总超时置 failed
+        started = file_status.get("started_at") or 0
+        if file_status.get("status") == "processing" and started and (time.time() - started) > MUSIC_TIMEOUT_SECS:
+            file_status = {
+                "status": "failed", "progress": 100, "result": None,
+                "error": f"生成超时（>{MUSIC_TIMEOUT_SECS}s），请稍后重试",
+                "started_at": started,
+            }
+            _write_music_job_status(job_id, file_status)
+            print(f"[generate] job={job_id} processing 超时，标记 failed", flush=True)
         return {"job_id": job_id, **file_status}
     # 2. 降级查 task_state_machine（供 create.py 等用例写入的位置）
     try:

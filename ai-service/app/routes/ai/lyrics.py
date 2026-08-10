@@ -52,6 +52,9 @@ async def generate_lyrics(request: Request):
         if not MOCK_FALLBACK_ENABLED:
             raise HTTPException(504, "AI generation timed out")
         result = None
+    except HTTPException as exc:
+        # 配额/限流类错误（429）必须真实透传，不得被 Mock fallback 吞掉
+        raise
     except Exception as exc:
         print(f"[lyrics] AI generation failed: {exc}")
         if not MOCK_FALLBACK_ENABLED:
@@ -80,6 +83,7 @@ async def generate_lyrics(request: Request):
                 "lrc": "",
                 "model": "mock",
                 "provider": "mock",
+                "is_mock": True,
                 "elapsed_ms": 0,
             },
         }
