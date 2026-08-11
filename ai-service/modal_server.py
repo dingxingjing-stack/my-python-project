@@ -492,9 +492,9 @@ def heartmula_generate(
                 temperature=1.0, topk=50, cfg_scale=cfg_scale,
                 continuous_segments=None, starts=None,
             )
-        frames_out.append(curr[0:1])
         if torch.any(curr[0:1] >= gcfg.audio_eos_id):
             break
+        frames_out.append(curr[0:1])
     frames = torch.stack(frames_out).permute(1, 2, 0).squeeze(0)
     t2 = time.time()
 
